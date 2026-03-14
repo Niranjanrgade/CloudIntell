@@ -39,8 +39,8 @@ def rag_search_function(query: str, vector_store: Chroma, k: int = 5) -> str:
             content = doc.page_content.strip()
             if len(content) > max_snippet_length:
                 content = content[:max_snippet_length] + "... [truncated]"
-            results.append(f"[Document {i}]:\\n{content}\\n")
+            results.append(f"[Document {i}]:\n{content}\n")
 
-        return "\\n---\\n".join(results)
+        return "\n---\n".join(results)
     except Exception as exc:
         return f"Error searching vector database: {exc}"

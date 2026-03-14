@@ -12,23 +12,6 @@ from cloud_intell.schemas.models import State
 logger = get_logger(__name__)
 
 
-def iteration_condition(state: dict) -> str:
-    """Decide whether to iterate again or finish the workflow."""
-
-    iteration = state.get("iteration_count", 0)
-    min_iterations = state.get("min_iterations", 1)
-    max_iterations = state.get("max_iterations", 3)
-    has_errors = state.get("factual_errors_exist", False)
-
-    if iteration < min_iterations:
-        return "iterate"
-    if has_errors and iteration < max_iterations:
-        return "iterate"
-    if iteration >= max_iterations:
-        return "finish"
-    return "finish"
-
-
 def _invoke_with_retries(llm, prompt: str, node_name: str, retries: int = 3) -> str:
     """Invoke an LLM prompt with bounded retries and validated text output."""
 
@@ -154,7 +137,8 @@ def validation_synthesizer(ctx: RuntimeContext):
         """
 
         validation_summary = _invoke_with_retries(ctx.reasoning_llm, prompt, "validation_synthesizer")
-        return cast(State, {"validation_summary": validation_summary})
+        any_errors = any(bool(fb.get("has_errors", False)) for fb in all_validation_feedback)
+        return cast(State, {"validation_summary": validation_summary, "factual_errors_exist": any_errors})
 
     return _node
 
@@ -215,5 +199,4 @@ __all__ = [
     "architect_synthesizer",
     "validation_synthesizer",
     "final_architecture_generator",
-    "iteration_condition",
 ]
