@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from langchain_core.messages import HumanMessage
 from langgraph.graph import END, START, StateGraph
 
 from cloud_intell.agents.context import RuntimeContext
@@ -22,13 +23,44 @@ from cloud_intell.agents.synthesizers import (
     validation_synthesizer,
 )
 from cloud_intell.graph.routing import iteration_condition
-from cloud_intell.schemas.models import State
+from cloud_intell.schemas.models import InputState, State
+
+
+def _input_handler(state: State) -> dict:
+    """Bridge Studio/API chat messages into graph state fields.
+
+    Allows users to trigger the graph from LangGraph Studio's chat panel
+    by simply typing their cloud architecture request.  The node also
+    initialises iteration counters so callers don't have to supply them.
+    """
+    updates: dict = {}
+
+    # If user_problem was not supplied explicitly, pull it from the last
+    # HumanMessage in the messages list (LangGraph Studio chat input).
+    if not state.get("user_problem"):
+        for msg in reversed(state.get("messages", [])):
+            if isinstance(msg, HumanMessage) or getattr(msg, "type", None) == "human":
+                updates["user_problem"] = msg.content
+                break
+
+    # Initialise iteration settings to sensible defaults when omitted.
+    if not state.get("iteration_count"):
+        updates["iteration_count"] = 0
+    if not state.get("min_iterations"):
+        updates["min_iterations"] = 1
+    if not state.get("max_iterations"):
+        updates["max_iterations"] = 3
+
+    return updates
 
 
 def build_graph(ctx: RuntimeContext, checkpointer: Any | None = None):
     """Build and compile LangGraph using modularized node factories."""
 
-    graph_builder = StateGraph(State)
+    graph_builder = StateGraph(State, input=InputState)
+
+    # Input handler — bridges Studio chat messages to state fields.
+    graph_builder.add_node("input_handler", _input_handler)
 
     # Architect nodes
     graph_builder.add_node("architect_supervisor", architect_supervisor(ctx))
@@ -48,7 +80,8 @@ def build_graph(ctx: RuntimeContext, checkpointer: Any | None = None):
     graph_builder.add_node("final_architecture_generator", final_architecture_generator(ctx))
 
     # Architecture generation flow.
-    graph_builder.add_edge(START, "architect_supervisor")
+    graph_builder.add_edge(START, "input_handler")
+    graph_builder.add_edge("input_handler", "architect_supervisor")
     graph_builder.add_edge("architect_supervisor", "compute_architect")
     graph_builder.add_edge("architect_supervisor", "network_architect")
     graph_builder.add_edge("architect_supervisor", "storage_architect")

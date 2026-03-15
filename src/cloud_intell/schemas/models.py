@@ -105,10 +105,15 @@ def validation_feedback_reducer(left: List[Any], right: List[Any]) -> List[Any]:
     return append_list(left, right)
 
 
-class State(TypedDict):
-    """Complete LangGraph state contract for architecture generation workflow."""
+class InputState(TypedDict):
+    """Narrow input schema exposing only the chat box in LangGraph Studio."""
 
     messages: Annotated[List, add_messages]
+
+
+class State(InputState):
+    """Complete LangGraph state contract for architecture generation workflow."""
+
     user_problem: Annotated[str, last_value]
     iteration_count: Annotated[int, last_value]
     min_iterations: Annotated[int, last_value]

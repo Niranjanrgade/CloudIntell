@@ -3,7 +3,7 @@
 import time
 from typing import Any, Dict, cast
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage
 
 from cloud_intell.agents.context import RuntimeContext
 from cloud_intell.infrastructure.logging_utils import get_logger
@@ -189,6 +189,9 @@ def final_architecture_generator(ctx: RuntimeContext):
             {
                 "final_architecture": final_state,
                 "architecture_summary": final_doc,
+                # Emit the document into messages so LangGraph Studio chat
+                # displays it as an assistant response.
+                "messages": [AIMessage(content=final_doc)],
             },
         )
 
