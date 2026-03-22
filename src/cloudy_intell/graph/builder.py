@@ -1,114 +1,89 @@
-"""Graph construction for the architecture workflow."""
+"""Graph construction for the architecture workflow.
+
+This module assembles the top-level LangGraph ``StateGraph`` by composing two
+pre-compiled subgraphs (architect_phase and validator_phase) with a conditional
+iteration edge and a final output node.
+
+The resulting graph topology is:
+
+    START
+      │
+      ▼
+    architect_phase (subgraph: supervisor → 4 parallel domain architects → synthesizer)
+      │
+      ▼
+    validator_phase (subgraph: supervisor → 4 parallel domain validators → synthesizer)
+      │
+      ▼
+    ┌─────────────────────┐
+    │ iteration_condition │─── "iterate" ──▶ architect_phase  (loops back)
+    └─────────────────────┘
+      │ "finish"
+      ▼
+    final_architecture_generator
+      │
+      ▼
+    END
+
+Subgraph composition keeps the top-level graph concise while encapsulating
+the fan-out/fan-in parallelism within each phase.
+"""
 
 from typing import Any
 
-from langchain_core.messages import HumanMessage
 from langgraph.graph import END, START, StateGraph
 
-from cloud_intell.agents.context import RuntimeContext
-from cloud_intell.agents.domain_nodes import (
-    compute_architect,
-    compute_validator,
-    database_architect,
-    database_validator,
-    network_architect,
-    network_validator,
-    storage_architect,
-    storage_validator,
-)
-from cloud_intell.agents.supervisors import architect_supervisor, validator_supervisor
-from cloud_intell.agents.synthesizers import (
-    architect_synthesizer,
-    final_architecture_generator,
-    validation_synthesizer,
-)
-from cloud_intell.graph.routing import iteration_condition
-from cloud_intell.schemas.models import InputState, State
+from cloudy_intell.agents.context import RuntimeContext
+from cloudy_intell.agents.synthesizers import final_architecture_generator
+from cloudy_intell.graph.routing import iteration_condition
+from cloudy_intell.graph.subgraphs import build_architect_subgraph, build_validator_subgraph
+from cloudy_intell.schemas.models import State
 
-
-def _input_handler(state: State) -> dict:
-    """Bridge Studio/API chat messages into graph state fields.
-
-    Allows users to trigger the graph from LangGraph Studio's chat panel
-    by simply typing their cloud architecture request.  The node also
-    initialises iteration counters so callers don't have to supply them.
-    """
-    updates: dict = {}
-
-    # If user_problem was not supplied explicitly, pull it from the last
-    # HumanMessage in the messages list (LangGraph Studio chat input).
-    if not state.get("user_problem"):
-        for msg in reversed(state.get("messages", [])):
-            if isinstance(msg, HumanMessage) or getattr(msg, "type", None) == "human":
-                updates["user_problem"] = msg.content
-                break
-
-    # Initialise iteration settings to sensible defaults when omitted.
-    if not state.get("iteration_count"):
-        updates["iteration_count"] = 0
-    if not state.get("min_iterations"):
-        updates["min_iterations"] = 1
-    if not state.get("max_iterations"):
-        updates["max_iterations"] = 3
-
-    return updates
+__all__ = ["build_graph"]
 
 
 def build_graph(ctx: RuntimeContext, checkpointer: Any | None = None):
-    """Build and compile LangGraph using modularized node factories."""
+    """Build and compile LangGraph using subgraph-based architecture.
 
-    graph_builder = StateGraph(State, input=InputState)
+    Top-level graph:
+        START → architect_phase → validator_phase → [conditional] →
+            iterate: architect_phase | finish: final_architecture_generator → END
 
-    # Input handler — bridges Studio chat messages to state fields.
-    graph_builder.add_node("input_handler", _input_handler)
+    Args:
+        ctx: Runtime context containing LLMs, tools, settings, and provider metadata.
+             Passed to subgraph builders so every nested node shares the same
+             dependencies.
+        checkpointer: Optional LangGraph checkpointer (e.g. MemorySaver) for
+                      persisting state across invocations.  When None the graph
+                      runs without checkpointing (used by ``langgraph dev``).
 
-    # Architect nodes
-    graph_builder.add_node("architect_supervisor", architect_supervisor(ctx))
-    graph_builder.add_node("compute_architect", compute_architect(ctx))
-    graph_builder.add_node("network_architect", network_architect(ctx))
-    graph_builder.add_node("storage_architect", storage_architect(ctx))
-    graph_builder.add_node("database_architect", database_architect(ctx))
-    graph_builder.add_node("architect_synthesizer", architect_synthesizer(ctx))
+    Returns:
+        A compiled LangGraph ``CompiledGraph`` ready to be invoked with an
+        initial state dictionary.
+    """
 
-    # Validator nodes
-    graph_builder.add_node("validator_supervisor", validator_supervisor(ctx))
-    graph_builder.add_node("compute_validator", compute_validator(ctx))
-    graph_builder.add_node("network_validator", network_validator(ctx))
-    graph_builder.add_node("storage_validator", storage_validator(ctx))
-    graph_builder.add_node("database_validator", database_validator(ctx))
-    graph_builder.add_node("validation_synthesizer", validation_synthesizer(ctx))
+    graph_builder = StateGraph(State)
+
+    # ── Compose subgraphs as nodes ───────────────────────────────────────
+    # Each subgraph is built as a StateGraph and then compiled into a
+    # standalone CompiledGraph.  Adding a compiled graph as a node makes it
+    # execute as a nested sub-workflow within the parent graph.
+    graph_builder.add_node("architect_phase", build_architect_subgraph(ctx).compile())
+    graph_builder.add_node("validator_phase", build_validator_subgraph(ctx).compile())
     graph_builder.add_node("final_architecture_generator", final_architecture_generator(ctx))
 
-    # Architecture generation flow.
-    graph_builder.add_edge(START, "input_handler")
-    graph_builder.add_edge("input_handler", "architect_supervisor")
-    graph_builder.add_edge("architect_supervisor", "compute_architect")
-    graph_builder.add_edge("architect_supervisor", "network_architect")
-    graph_builder.add_edge("architect_supervisor", "storage_architect")
-    graph_builder.add_edge("architect_supervisor", "database_architect")
+    # ── Linear edges ──────────────────────────────────────────────────
+    graph_builder.add_edge(START, "architect_phase")
+    graph_builder.add_edge("architect_phase", "validator_phase")
 
-    graph_builder.add_edge("compute_architect", "architect_synthesizer")
-    graph_builder.add_edge("network_architect", "architect_synthesizer")
-    graph_builder.add_edge("storage_architect", "architect_synthesizer")
-    graph_builder.add_edge("database_architect", "architect_synthesizer")
-
-    # Validation flow.
-    graph_builder.add_edge("architect_synthesizer", "validator_supervisor")
-    graph_builder.add_edge("validator_supervisor", "compute_validator")
-    graph_builder.add_edge("validator_supervisor", "network_validator")
-    graph_builder.add_edge("validator_supervisor", "storage_validator")
-    graph_builder.add_edge("validator_supervisor", "database_validator")
-
-    graph_builder.add_edge("compute_validator", "validation_synthesizer")
-    graph_builder.add_edge("network_validator", "validation_synthesizer")
-    graph_builder.add_edge("storage_validator", "validation_synthesizer")
-    graph_builder.add_edge("database_validator", "validation_synthesizer")
-
-    # Iteration routing.
+    # ── Conditional iteration routing ─────────────────────────────────
+    # After the validator phase completes, ``iteration_condition`` inspects
+    # the state to decide whether to loop back to architect_phase (if errors
+    # exist and iterations are below max) or proceed to final output.
     graph_builder.add_conditional_edges(
-        "validation_synthesizer",
+        "validator_phase",
         iteration_condition,
-        {"iterate": "architect_supervisor", "finish": "final_architecture_generator"},
+        {"iterate": "architect_phase", "finish": "final_architecture_generator"},
     )
     graph_builder.add_edge("final_architecture_generator", END)
 
