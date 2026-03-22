@@ -1,19 +1,28 @@
 """LangGraph dev/studio entrypoint.
 
-This module exposes a compiled graph object so `langgraph dev` can discover
+This module exposes a compiled graph object so ``langgraph dev`` can discover
 and run the workflow directly from repository configuration.
+
+When you run ``langgraph dev``, the LangGraph CLI reads ``langgraph.json``
+which points to this module's ``graph`` symbol.  The function builds the full
+runtime (settings, LLMs, vector store, tools, graph) using AWS as the default
+provider, then returns the compiled graph.
+
+Unlike the CLI/service entrypoint, this module does NOT create a checkpointer
+because the LangGraph dev server manages persistence automatically.
 """
 
 from dotenv import load_dotenv
 
-from cloud_intell.agents.context import RuntimeContext
-from cloud_intell.config.settings import get_settings
-from cloud_intell.graph.builder import build_graph
-from cloud_intell.infrastructure.llm_factory import create_execution_llm, create_reasoning_llm
-from cloud_intell.infrastructure.logging_utils import configure_logging
-from cloud_intell.infrastructure.tools import create_tool_bundle
-from cloud_intell.infrastructure.vector_store import create_vector_store
-from cloud_intell.services.architecture_service import configure_langsmith_environment
+from cloudy_intell.agents.context import RuntimeContext
+from cloudy_intell.config.provider_meta import AWS_META
+from cloudy_intell.config.settings import get_settings
+from cloudy_intell.graph.builder import build_graph
+from cloudy_intell.infrastructure.llm_factory import create_execution_llm, create_reasoning_llm
+from cloudy_intell.infrastructure.logging_utils import configure_logging
+from cloudy_intell.infrastructure.tools import create_tool_bundle
+from cloudy_intell.infrastructure.vector_store import create_vector_store
+from cloudy_intell.services.architecture_service import configure_langsmith_environment
 
 
 def build_runtime_graph():
@@ -27,14 +36,15 @@ def build_runtime_graph():
 
     mini_llm = create_execution_llm(settings)
     reasoning_llm = create_reasoning_llm(settings)
-    vector_store = create_vector_store(settings)
-    tools = create_tool_bundle(mini_llm, vector_store)
+    vector_store = create_vector_store(settings, provider="aws")
+    tools = create_tool_bundle(mini_llm, vector_store, provider_meta=AWS_META)
 
     ctx = RuntimeContext(
         settings=settings,
         mini_llm=mini_llm,
         reasoning_llm=reasoning_llm,
         tools=tools,
+        provider=AWS_META,
     )
     # LangGraph API dev mode manages persistence automatically.
     return build_graph(ctx)
