@@ -1,19 +1,59 @@
-"""Domain architect and validator node factories."""
+"""Domain architect and validator node factories.
+
+All prompt text is driven by ``RuntimeContext.provider`` metadata, making
+these factories provider-agnostic (AWS, Azure, GCP, etc.).
+
+This module defines the core domain-level agents:
+
+- **Domain Architects** (compute, network, storage, database): Each architect
+  receives a task assignment from the architect supervisor, uses web search
+  and/or RAG tools to gather information, and produces detailed infrastructure
+  recommendations for its specific domain.
+
+- **Domain Validators** (compute, network, storage, database): Each validator
+  checks the proposed architecture for its domain against official cloud
+  provider documentation (via RAG tool) and produces a structured validation
+  report with errors, warnings, and improvement suggestions.
+
+Both architect and validator functions are implemented as closures: the outer
+function (e.g. ``_domain_architect``) captures the ``RuntimeContext`` and domain
+name, while the inner ``_node`` function matches the LangGraph node signature
+``(state: State) -> State``.
+"""
 
 from typing import Any, Dict, cast
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from cloud_intell.agents.context import RuntimeContext
-from cloud_intell.agents.tool_execution import detect_errors_llm, execute_tool_calls, format_component_recommendations
-from cloud_intell.infrastructure.logging_utils import get_logger
-from cloud_intell.schemas.models import State
+from cloudy_intell.agents.context import RuntimeContext
+from cloudy_intell.agents.tool_execution import detect_errors_llm, execute_tool_calls, format_component_recommendations
+from cloudy_intell.infrastructure.logging_utils import get_logger
+from cloudy_intell.schemas.models import State
 
 logger = get_logger(__name__)
 
 
-def _domain_architect(ctx: RuntimeContext, domain: str, domain_services: str):
-    """Create one domain architect node with shared execution behavior."""
+def _domain_architect(ctx: RuntimeContext, domain: str):
+    """Create one domain architect node using provider metadata for services.
+
+    The architect node performs the following steps:
+    1. Reads its task assignment from ``state["architecture_domain_tasks"][domain]``.
+    2. Checks for prior validation feedback to incorporate in refinement iterations.
+    3. Constructs a system prompt with the task details, constraints, and provider context.
+    4. Calls the LLM with tool access (web search + RAG) to generate recommendations.
+    5. Formats the output via ``format_component_recommendations`` and returns a
+       partial state update that writes to ``state["architecture_components"][domain]``.
+
+    Args:
+        ctx: Runtime context with LLMs, tools, and provider metadata.
+        domain: The architecture domain ("compute", "network", "storage", or "database").
+
+    Returns:
+        A LangGraph node function ``(State) -> State``.
+    """
+
+    provider = ctx.provider
+    domain_services = provider.domain_services.get(domain, f"{domain} services")
 
     def _node(state: State) -> State:
         domain_task = state["architecture_domain_tasks"].get(domain, {})
@@ -53,7 +93,7 @@ def _domain_architect(ctx: RuntimeContext, domain: str, domain_services: str):
                 validation_context += f"\n[{status}]: {result[:300]}...\n"
 
         system_prompt = f"""
-        You are an AWS {domain.capitalize()} Domain Architect.
+        You are an {provider.display_name} {domain.capitalize()} Domain Architect.
         Design the {domain} infrastructure based on the task.
 
         Original Problem: {state['user_problem']}
@@ -115,8 +155,33 @@ def _domain_architect(ctx: RuntimeContext, domain: str, domain_services: str):
     return _node
 
 
-def _domain_validator(ctx: RuntimeContext, domain: str, validation_checks: str):
-    """Create one domain validator node with shared validation behavior."""
+def _domain_validator(ctx: RuntimeContext, domain: str):
+    """Create one domain validator node using provider metadata for checks.
+
+    The validator node performs the following steps:
+    1. Reads validation task details from ``state["architecture_domain_tasks"]["validation_tasks"][domain]``.
+    2. Reads the proposed architecture components for its domain.
+    3. Constructs a system prompt referencing official provider documentation checks.
+    4. Calls the LLM with RAG tool access to validate against documentation.
+    5. Uses ``detect_errors_llm`` to classify whether the validation result
+       indicates actionable errors.
+    6. Returns a partial state update with validation feedback and error flags.
+
+    Args:
+        ctx: Runtime context with LLMs, tools, and provider metadata.
+        domain: The architecture domain ("compute", "network", "storage", or "database").
+
+    Returns:
+        A LangGraph node function ``(State) -> State``.
+    """
+
+    provider = ctx.provider
+    validation_checks = provider.validation_checks.get(
+        domain,
+        "1. Service names and configurations are correct\n"
+        "    2. Best practices are followed\n"
+        "    3. Any factual errors or misconfigurations",
+    )
 
     def _node(state: State) -> State:
         validation_tasks = state.get("architecture_domain_tasks", {}).get("validation_tasks", {})
@@ -146,8 +211,8 @@ def _domain_validator(ctx: RuntimeContext, domain: str, validation_checks: str):
         recommendations = domain_components.get("recommendations", "")
 
         system_prompt = f"""
-        You are a {domain} domain validator for AWS cloud architecture.
-        Your role is to validate {domain} architecture recommendations against official AWS documentation.
+        You are a {domain} domain validator for {provider.display_name} cloud architecture.
+        Your role is to validate {domain} architecture recommendations against official {provider.display_name} documentation.
 
         Original Problem: {state['user_problem']}
 
@@ -157,7 +222,7 @@ def _domain_validator(ctx: RuntimeContext, domain: str, validation_checks: str):
         Proposed {domain.capitalize()} Architecture:
         {recommendations}
 
-        Use the RAG_search tool to retrieve relevant AWS documentation for each component.
+        Use the RAG_search tool to retrieve relevant {provider.display_name} documentation for each component.
         Validate:
         {validation_checks}
 
@@ -203,55 +268,32 @@ def _domain_validator(ctx: RuntimeContext, domain: str, validation_checks: str):
 
 
 def compute_architect(ctx: RuntimeContext):
-    return _domain_architect(ctx, "compute", "EC2, Lambda, ECS, EKS, Auto Scaling, etc.")
+    return _domain_architect(ctx, "compute")
 
 
 def network_architect(ctx: RuntimeContext):
-    return _domain_architect(ctx, "network", "VPC, Subnets, ALB, CloudFront, Route 53, Security Groups, etc.")
+    return _domain_architect(ctx, "network")
 
 
 def storage_architect(ctx: RuntimeContext):
-    return _domain_architect(ctx, "storage", "S3, EBS, EFS, Glacier, etc.")
+    return _domain_architect(ctx, "storage")
 
 
 def database_architect(ctx: RuntimeContext):
-    return _domain_architect(ctx, "database", "RDS, DynamoDB, ElastiCache, etc.")
+    return _domain_architect(ctx, "database")
 
 
 def compute_validator(ctx: RuntimeContext):
-    checks = """1. Service names and configurations are correct
-    2. Best practices are followed
-    3. Service compatibility and integration
-    4. Configuration parameters are valid
-    5. Any factual errors or misconfigurations"""
-    return _domain_validator(ctx, "compute", checks)
+    return _domain_validator(ctx, "compute")
 
 
 def network_validator(ctx: RuntimeContext):
-    checks = """1. VPC configuration (CIDR blocks, subnets, routing)
-    2. Security group rules and network ACLs
-    3. Load balancer configurations
-    4. DNS and CDN setup
-    5. Network connectivity and routing
-    6. Any factual errors or misconfigurations"""
-    return _domain_validator(ctx, "network", checks)
+    return _domain_validator(ctx, "network")
 
 
 def storage_validator(ctx: RuntimeContext):
-    checks = """1. S3 bucket configurations and policies
-    2. EBS volume types and configurations
-    3. EFS setup and performance modes
-    4. Storage lifecycle policies
-    5. Encryption and access controls
-    6. Any factual errors or misconfigurations"""
-    return _domain_validator(ctx, "storage", checks)
+    return _domain_validator(ctx, "storage")
 
 
 def database_validator(ctx: RuntimeContext):
-    checks = """1. Database engine selection and configuration
-    2. Instance types and sizing
-    3. Backup and recovery configurations
-    4. High availability and replication setup
-    5. Security and encryption settings
-    6. Any factual errors or misconfigurations"""
-    return _domain_validator(ctx, "database", checks)
+    return _domain_validator(ctx, "database")

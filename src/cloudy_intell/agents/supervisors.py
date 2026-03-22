@@ -1,7 +1,22 @@
 """Supervisor node factories.
 
-Factory pattern lets the graph bind runtime context once and then run
-simple state->state callables required by LangGraph.
+All prompt text is driven by ``RuntimeContext.provider`` metadata, making
+these factories provider-agnostic (AWS, Azure, GCP, etc.).
+
+Supervisors are the "orchestration" agents in the workflow:
+
+- **Architect Supervisor**: Receives the user problem and decomposes it into
+  structured, domain-specific task assignments (one per domain).  On subsequent
+  iterations, it incorporates validation feedback to produce refined tasks.
+  Uses ``with_structured_output(TaskDecomposition)`` to guarantee the LLM
+  returns valid, typed JSON matching the Pydantic schema.
+
+- **Validator Supervisor**: Inspects the proposed architecture components and
+  creates targeted validation assignments for each domain that has active
+  components.  Uses ``with_structured_output(ValidationDecomposition)``.
+
+Both supervisors include retry logic with exponential backoff to handle
+transient LLM API failures gracefully.
 """
 
 import time
@@ -9,15 +24,35 @@ from typing import cast
 
 from langchain_core.messages import SystemMessage
 
-from cloud_intell.agents.context import RuntimeContext
-from cloud_intell.infrastructure.logging_utils import get_logger
-from cloud_intell.schemas.models import State, TaskDecomposition, ValidationDecomposition
+from cloudy_intell.agents.context import RuntimeContext
+from cloudy_intell.infrastructure.logging_utils import get_logger
+from cloudy_intell.schemas.models import State, TaskDecomposition, ValidationDecomposition
 
 logger = get_logger(__name__)
 
 
 def architect_supervisor(ctx: RuntimeContext):
-    """Create architect supervisor node bound to runtime context."""
+    """Create architect supervisor node bound to runtime context.
+
+    The architect supervisor is the entry point for each iteration.  It:
+    1. Increments the iteration counter.
+    2. Reads any validation feedback from the previous iteration.
+    3. Builds a system prompt listing all architecture domains and their
+       representative services (from provider metadata).
+    4. Invokes the reasoning LLM with structured output to produce a
+       ``TaskDecomposition`` containing one ``DomainTask`` per domain.
+    5. Clears stale state fields (validation_feedback, architecture_components,
+       proposed_architecture, factual_errors_exist) to prepare for fresh
+       outputs from domain architects.
+    6. Returns a partial state update that populates ``architecture_domain_tasks``
+       with the decomposed tasks.
+
+    On error, it returns a state with ``factual_errors_exist=True`` and an
+    error message in ``architecture_summary`` so the iteration loop terminates
+    gracefully rather than crashing.
+    """
+
+    provider = ctx.provider
 
     def _node(state: State) -> State:
         iteration = state["iteration_count"] + 1
@@ -35,8 +70,13 @@ def architect_supervisor(ctx: RuntimeContext):
         if previous_validation_summary:
             feedback_context += f"\n\nValidation Summary: {previous_validation_summary}\n"
 
+        domain_lines = "\n        ".join(
+            f"{i}. {domain} ({services})"
+            for i, (domain, services) in enumerate(provider.domain_services.items(), 1)
+        )
+
         system_prompt = f"""
-        You are an architect supervisor for AWS cloud architecture.
+        You are an architect supervisor for {provider.display_name} cloud architecture.
         Your role is to decompose the user's problem into structured domain-specific tasks and assign them to different architect domain agents.
 
         User Problem: {state['user_problem']}
@@ -45,10 +85,7 @@ def architect_supervisor(ctx: RuntimeContext):
         {feedback_context}
 
         Decompose the problem into structured tasks for these domains:
-        1. compute (EC2, Lambda, ECS, EKS, Auto Scaling, etc.)
-        2. network (VPC, Subnets, ALB, CloudFront, Route 53, Security Groups, etc.)
-        3. storage (S3, EBS, EFS, etc.)
-        4. database (RDS, DynamoDB, ElastiCache, etc.)
+        {domain_lines}
 
         For each domain, provide a clear task description, key requirements, constraints and expected deliverables.
         Also provide overall architecture goals and global constraints.
@@ -133,14 +170,35 @@ def architect_supervisor(ctx: RuntimeContext):
 
 
 def validator_supervisor(ctx: RuntimeContext):
-    """Create validator supervisor node bound to runtime context."""
+    """Create validator supervisor node bound to runtime context.
+
+    The validator supervisor inspects the proposed architecture and creates
+    targeted validation assignments.  It:
+    1. Reads ``architecture_components`` and ``proposed_architecture`` from state.
+    2. Builds a system prompt asking the LLM to identify which components
+       need validation and what aspects to focus on.
+    3. Invokes the reasoning LLM with structured output to produce a
+       ``ValidationDecomposition``.
+    4. Merges the validation task assignments into ``architecture_domain_tasks``
+       under the ``validation_tasks`` key, preserving existing task data.
+
+    Only domains with active components receive validation tasks; empty
+    domains are intentionally skipped.
+    """
+
+    provider = ctx.provider
 
     def _node(state: State) -> State:
         architecture_components = state.get("architecture_components", {})
         proposed_architecture = state.get("proposed_architecture", {})
 
+        domain_lines = "\n        ".join(
+            f"{i}. {domain} ({services})"
+            for i, (domain, services) in enumerate(provider.domain_services.items(), 1)
+        )
+
         system_prompt = f"""
-        You are a validator supervisor for AWS cloud architecture validation.
+        You are a validator supervisor for {provider.display_name} cloud architecture validation.
         Your role is to decompose the validation task into domain-specific validation assignments.
 
         Original Problem: {state['user_problem']}
@@ -152,13 +210,10 @@ def validator_supervisor(ctx: RuntimeContext):
         {proposed_architecture.get('architecture_summary', 'No summary available')}
 
         Analyze the architecture components and create validation tasks for these domains:
-        1. compute (EC2, Lambda, ECS, EKS, Auto Scaling, etc.)
-        2. network (VPC, Subnets, ALB, CloudFront, Route 53, Security Groups, etc.)
-        3. storage (S3, EBS, EFS, Glacier, etc.)
-        4. database (RDS, DynamoDB, ElastiCache, etc.)
+        {domain_lines}
 
         For each domain that has components in the architecture:
-        - List the specific AWS services/components that need validation
+        - List the specific {provider.display_name} services/components that need validation
         - Specify what aspects to validate (configuration correctness, best practices, service compatibility, etc.)
 
         Only create validation tasks for domains that actually have components in the architecture.
