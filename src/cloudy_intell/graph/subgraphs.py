@@ -35,7 +35,6 @@ from cloudy_intell.agents.domain_nodes import (
 from cloudy_intell.agents.supervisors import architect_supervisor, validator_supervisor
 from cloudy_intell.agents.synthesizers import (
     architect_synthesizer,
-    final_architecture_generator,
     validation_synthesizer,
 )
 from cloudy_intell.schemas.models import State

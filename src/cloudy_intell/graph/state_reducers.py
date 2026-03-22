@@ -7,7 +7,7 @@ state constants used by graph/service code.
 
 from langchain_core.messages import HumanMessage
 
-from cloud_intell.schemas.models import State
+from cloudy_intell.schemas.models import State
 
 
 def create_initial_state(user_problem: str, min_iterations: int = 1, max_iterations: int = 3) -> State:

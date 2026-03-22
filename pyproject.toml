@@ -1,5 +1,5 @@
 [project]
-name = "cloudintell"
+name = "cloudy-intell"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -14,5 +14,9 @@ dependencies = [
     "langgraph-cli[inmem]>=0.4.17",
     "langsmith>=0.7.17",
     "pydantic>=2.12.5",
+    "pydantic-settings>=2.7.0",
     "python-dotenv>=1.2.2",
 ]
+
+[tool.setuptools.packages.find]
+where = ["src"]

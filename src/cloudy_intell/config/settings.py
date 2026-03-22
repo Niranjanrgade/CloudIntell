@@ -71,6 +71,9 @@ class AppSettings(BaseSettings):
     providers_azure_collection_name: str = "AzureDocs"   # ChromaDB collection containing Azure documentation embeddings.
     providers_azure_vector_path: str = "./chroma_db_AzureDocs"  # Local directory for the Azure ChromaDB on-disk store.
 
+    # ── API keys ────────────────────────────────────────────────────────
+    serper_api_key: str = Field(default="", description="Google Serper API key for web search tool.")
+
     # ── Embedding model ─────────────────────────────────────────────────
     # Currently Ollama-based.  The embedding model is used to encode queries
     # for similarity search against the provider documentation vector stores.

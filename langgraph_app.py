@@ -12,7 +12,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from cloud_intell.langgraph_app import build_runtime_graph
+from cloudy_intell.langgraph_app import build_runtime_graph
 
 
 graph = build_runtime_graph()
