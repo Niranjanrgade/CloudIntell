@@ -73,16 +73,17 @@ export function useRunOrchestration() {
       // Open LangGraph Studio in a new tab
       const baseUrl =
         process.env.NEXT_PUBLIC_LANGGRAPH_API_URL || 'http://localhost:2024';
-      const url = `https://smith.langchain.com/studio/thread/${thread_id}?baseUrl=${encodeURIComponent(baseUrl)}`;
-      setStudioUrl(url);
-      window.open(url, '_blank', 'noopener');
+      const studioUrl = `${baseUrl}/studio/thread/${thread_id}`;
+      const smithUrl = `https://smith.langchain.com/studio/thread/${thread_id}?baseUrl=${encodeURIComponent(baseUrl)}`;
+      setStudioUrl(smithUrl);
+      window.open(smithUrl, '_blank', 'noopener');
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 0.1,
           role: 'assistant',
-          content: 'Opened LangGraph Studio — track the run in real time.',
-          link: url,
+          content: `Thread ID: ${thread_id}\nOpened LangGraph Studio — track the run in real time.\nIf Studio fails, trace this thread in LangSmith or use the local dev server UI.`,
+          link: smithUrl,
         },
       ]);
 
