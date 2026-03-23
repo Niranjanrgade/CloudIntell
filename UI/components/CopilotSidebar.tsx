@@ -32,7 +32,6 @@ interface CopilotSidebarProps {
   runStatus: RunStatus;
   messages: ChatMessage[];
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
-  studioUrl?: string | null;
 }
 
 export function CopilotSidebar({
@@ -42,7 +41,6 @@ export function CopilotSidebar({
   runStatus,
   messages,
   setMessages,
-  studioUrl,
 }: CopilotSidebarProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [input, setInput] = useState('');
@@ -110,17 +108,6 @@ export function CopilotSidebar({
           </div>
         </div>
         <div className="flex items-center gap-1">
-          {studioUrl && (
-            <a
-              href={studioUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="View in LangGraph Studio"
-              className="p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-md transition-colors"
-            >
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          )}
           <button
             onClick={() => setIsOpen(false)}
             className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"

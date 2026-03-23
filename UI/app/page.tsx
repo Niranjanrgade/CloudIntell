@@ -33,7 +33,6 @@ export default function Home() {
     messages,
     setMessages,
     architectureResult,
-    studioUrl,
     startRun,
   } = useRunOrchestration();
 
@@ -67,7 +66,6 @@ export default function Home() {
               runStatus={runStatus}
               messages={messages}
               setMessages={setMessages}
-              studioUrl={studioUrl}
             />
           </>
         ) : (
@@ -105,7 +103,6 @@ export default function Home() {
               runStatus={runStatus}
               messages={messages}
               setMessages={setMessages}
-              studioUrl={studioUrl}
             />
           </>
         )}

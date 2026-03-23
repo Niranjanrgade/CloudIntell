@@ -38,7 +38,6 @@ export function useRunOrchestration() {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [architectureResult, setArchitectureResult] =
     useState<ArchitectureState | null>(null);
-  const [studioUrl, setStudioUrl] = useState<string | null>(null);
   const threadIdRef = useRef<string | null>(null);
   const msgIdRef = useRef(100);
   const timeoutIdsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -70,20 +69,13 @@ export function useRunOrchestration() {
       const { thread_id } = await threadRes.json();
       threadIdRef.current = thread_id;
 
-      // Open LangGraph Studio in a new tab
-      const baseUrl =
-        process.env.NEXT_PUBLIC_LANGGRAPH_API_URL || 'http://localhost:2024';
-      const studioUrl = `${baseUrl}/studio/thread/${thread_id}`;
-      const smithUrl = `https://smith.langchain.com/studio/thread/${thread_id}?baseUrl=${encodeURIComponent(baseUrl)}`;
-      setStudioUrl(smithUrl);
-      window.open(smithUrl, '_blank', 'noopener');
+      // Show thread ID for LangSmith tracing
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 0.1,
           role: 'assistant',
-          content: `Thread ID: ${thread_id}\nOpened LangGraph Studio — track the run in real time.\nIf Studio fails, trace this thread in LangSmith or use the local dev server UI.`,
-          link: smithUrl,
+          content: `Thread ID: ${thread_id} — use this to trace the run in LangSmith.`,
         },
       ]);
 
@@ -219,7 +211,6 @@ export function useRunOrchestration() {
     messages,
     setMessages,
     architectureResult,
-    studioUrl,
     startRun,
   };
 }
