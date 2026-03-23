@@ -21,6 +21,7 @@ import { useState } from 'react';
 import { CopilotSidebar, ViewMode } from '@/components/CopilotSidebar';
 import { CompareView } from '@/components/CompareView';
 import { SidebarNavigator } from '@/components/SidebarNavigator';
+import { WorkflowGraph } from '@/components/WorkflowGraph';
 import { useRunOrchestration } from '@/hooks/useRunOrchestration';
 
 export default function Home() {
