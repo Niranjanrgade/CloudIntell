@@ -20,8 +20,8 @@
 'use client';
 
 import { useState, useRef, useEffect, Dispatch, SetStateAction } from 'react';
-import { Send, Bot, User, Sparkles, X, Loader2, Activity, ExternalLink } from 'lucide-react';
-import type { RunStatus, ChatMessage } from '@/lib/types';
+import { Send, Bot, User, Sparkles, X, Loader2, Activity, ExternalLink, FileText } from 'lucide-react';
+import type { RunStatus, ChatMessage, ArchitectureState } from '@/lib/types';
 
 export type ViewMode = 'AWS' | 'Azure' | 'Compare';
 
@@ -32,6 +32,8 @@ interface CopilotSidebarProps {
   runStatus: RunStatus;
   messages: ChatMessage[];
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
+  architectureResult?: ArchitectureState | null;
+  onViewFullReport?: () => void;
 }
 
 export function CopilotSidebar({
@@ -41,6 +43,8 @@ export function CopilotSidebar({
   runStatus,
   messages,
   setMessages,
+  architectureResult,
+  onViewFullReport,
 }: CopilotSidebarProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [input, setInput] = useState('');
@@ -87,7 +91,7 @@ export function CopilotSidebar({
 
   const containerClasses =
     variant === 'sidebar'
-      ? 'w-96 bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full z-40 transition-all duration-300 ease-in-out'
+      ? 'w-[28rem] bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full z-40 transition-all duration-300 ease-in-out'
       : 'w-full h-72 bg-white border-t border-slate-200 shadow-2xl flex flex-col z-40 transition-all duration-300 ease-in-out';
 
   return (
@@ -182,6 +186,20 @@ export function CopilotSidebar({
             </div>
           </div>
         )}
+
+        {/* View Full Report button */}
+        {architectureResult?.architecture_summary && onViewFullReport && runStatus === 'completed' && (
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={onViewFullReport}
+              className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition-colors shadow-md"
+            >
+              <FileText className="w-4 h-4" />
+              View Full Architecture Report
+            </button>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 

@@ -22,10 +22,12 @@ import { CopilotSidebar, ViewMode } from '@/components/CopilotSidebar';
 import { CompareView } from '@/components/CompareView';
 import { SidebarNavigator } from '@/components/SidebarNavigator';
 import { WorkflowGraph } from '@/components/WorkflowGraph';
+import { ArchitectureFullView } from '@/components/ArchitectureFullView';
 import { useRunOrchestration } from '@/hooks/useRunOrchestration';
 
 export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('AWS');
+  const [showFullReport, setShowFullReport] = useState(false);
   const {
     runStatus,
     activeNodes,
@@ -70,30 +72,37 @@ export default function Home() {
           </>
         ) : (
           <>
-            {/* Main Content Area - Graph */}
-            <div className="flex-1 h-full relative flex flex-col">
-              {/* Header Overlay */}
-              <div className="absolute top-0 left-0 right-0 p-6 z-10 pointer-events-none">
-                <h2 className="text-2xl font-bold text-slate-800">
-                  {viewMode} Architecture
-                </h2>
-                <p className="text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
-                  An agentic AI framework using LangGraph to automate and
-                  validate complex cloud architectures via a recursive
-                  Evaluator-Optimizer pattern.
-                </p>
-              </div>
+            {/* Main Content Area - Graph or Full Report */}
+            {showFullReport && architectureResult ? (
+              <ArchitectureFullView
+                result={architectureResult}
+                onBack={() => setShowFullReport(false)}
+              />
+            ) : (
+              <div className="flex-1 h-full relative flex flex-col">
+                {/* Header Overlay */}
+                <div className="absolute top-0 left-0 right-0 p-6 z-10 pointer-events-none">
+                  <h2 className="text-2xl font-bold text-slate-800">
+                    {viewMode} Architecture
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                    An agentic AI framework using LangGraph to automate and
+                    validate complex cloud architectures via a recursive
+                    Evaluator-Optimizer pattern.
+                  </p>
+                </div>
 
-              {/* Graph Container */}
-              <div className="w-full h-full">
-                <WorkflowGraph
-                  provider={viewMode}
-                  activeNodes={activeNodes}
-                  completedNodes={completedNodes}
-                  runStatus={runStatus}
-                />
+                {/* Graph Container */}
+                <div className="w-full h-full">
+                  <WorkflowGraph
+                    provider={viewMode}
+                    activeNodes={activeNodes}
+                    completedNodes={completedNodes}
+                    runStatus={runStatus}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Right Sidebar - Copilot */}
             <CopilotSidebar
@@ -103,6 +112,8 @@ export default function Home() {
               runStatus={runStatus}
               messages={messages}
               setMessages={setMessages}
+              architectureResult={architectureResult}
+              onViewFullReport={() => setShowFullReport(true)}
             />
           </>
         )}
