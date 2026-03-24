@@ -24,11 +24,13 @@ export async function POST(req: NextRequest) {
     const {
       thread_id,
       user_problem,
+      cloud_provider = 'aws',
       min_iterations = 1,
       max_iterations = 3,
     } = body as {
       thread_id: string;
       user_problem: string;
+      cloud_provider?: string;
       min_iterations?: number;
       max_iterations?: number;
     };
@@ -61,8 +63,11 @@ export async function POST(req: NextRequest) {
       architecture_summary: null,
     };
 
+    // Select the correct graph based on cloud provider
+    const graphName = cloud_provider === 'azure' ? 'cloudy-intell-azure' : 'cloudy-intell';
+
     // Stream the run with "updates" mode so we see per-node state deltas
-    const streamResponse = client.runs.stream(thread_id, 'cloudy-intell', {
+    const streamResponse = client.runs.stream(thread_id, graphName, {
       input,
       streamMode: ['updates'],
     });

@@ -28,7 +28,7 @@ export type ViewMode = 'AWS' | 'Azure' | 'Compare';
 interface CopilotSidebarProps {
   provider: ViewMode;
   variant?: 'sidebar' | 'bottom';
-  onRunStart: (problem: string) => Promise<void>;
+  onRunStart: (problem: string, provider: string) => Promise<void>;
   runStatus: RunStatus;
   messages: ChatMessage[];
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
@@ -75,7 +75,7 @@ export function CopilotSidebar({
     if (!input.trim() || runStatus === 'running') return;
     const problem = input.trim();
     setInput('');
-    onRunStart(problem);
+    onRunStart(problem, provider);
   };
 
   if (!isOpen) {

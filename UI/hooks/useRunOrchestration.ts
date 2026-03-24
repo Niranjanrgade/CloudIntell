@@ -49,7 +49,7 @@ export function useRunOrchestration() {
     };
   }, []);
 
-  const startRun = useCallback(async (userProblem: string) => {
+  const startRun = useCallback(async (userProblem: string, provider: string = 'AWS') => {
     const userMsg: ChatMessage = {
       id: Date.now(),
       role: 'user',
@@ -83,7 +83,7 @@ export function useRunOrchestration() {
       const streamRes = await fetch('/api/runs/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ thread_id, user_problem: userProblem }),
+        body: JSON.stringify({ thread_id, user_problem: userProblem, cloud_provider: provider.toLowerCase() }),
       });
       if (!streamRes.ok || !streamRes.body)
         throw new Error('Failed to start streaming run');
