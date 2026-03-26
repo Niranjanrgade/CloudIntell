@@ -1,6 +1,6 @@
 {
-  "messages": [{"role": "human", "content": "Design a secure, scalable three-tier web application on AWS with auto-scaling, CDN, and managed database"}],
-  "user_problem": "Design a secure, scalable three-tier web application on AWS with auto-scaling, CDN, and managed database",
+  "messages": [{"role": "human", "content": "Design a secure, scalable three-tier web application on with auto-scaling, CDN, and managed database"}],
+  "user_problem": "Design a secure, scalable three-tier web application on with auto-scaling, CDN, and managed database",
   "iteration_count": 0,
   "min_iterations": 1,
   "max_iterations": 3,
