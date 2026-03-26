@@ -182,56 +182,75 @@ export function useRunOrchestration() {
 
     try {
       if (isCompare) {
-        // ── Compare mode: run AWS then Azure sequentially ──────────
-        // AWS thread
-        const awsThreadRes = await fetch('/api/threads', { method: 'POST' });
+        // ── Compare mode: run AWS and Azure in parallel ────────────
+        const [awsThreadRes, azureThreadRes] = await Promise.all([
+          fetch('/api/threads', { method: 'POST' }),
+          fetch('/api/threads', { method: 'POST' }),
+        ]);
         if (!awsThreadRes.ok) throw new Error('Failed to create AWS thread');
-        const { thread_id: awsThreadId } = await awsThreadRes.json();
+        if (!azureThreadRes.ok) throw new Error('Failed to create Azure thread');
+
+        const [{ thread_id: awsThreadId }, { thread_id: azureThreadId }] =
+          await Promise.all([awsThreadRes.json(), azureThreadRes.json()]);
 
         setMessages((prev) => [
           ...prev,
           {
             id: Date.now() + 0.1,
             role: 'assistant',
-            content: `Starting AWS pipeline (Thread: ${awsThreadId})…`,
+            content: `Starting AWS and Azure pipelines in parallel (AWS Thread: ${awsThreadId}, Azure Thread: ${azureThreadId})…`,
           },
         ]);
 
-        const awsState = await runSingleProvider(userProblem, 'aws', awsThreadId);
-        setAwsResult(awsState);
-        setArchitectureResult(awsState);
-
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now() + 0.2,
-            role: 'assistant',
-            content: 'AWS architecture generated. Starting Azure pipeline…',
-          },
+        // Run both providers concurrently
+        const [awsSettled, azureSettled] = await Promise.allSettled([
+          runSingleProvider(userProblem, 'aws', awsThreadId),
+          runSingleProvider(userProblem, 'azure', azureThreadId),
         ]);
 
-        // Reset node status for Azure run
-        setActiveNodes(new Set());
+        const awsState =
+          awsSettled.status === 'fulfilled' ? awsSettled.value : null;
+        const azureState =
+          azureSettled.status === 'fulfilled' ? azureSettled.value : null;
 
-        // Azure thread
-        const azureThreadRes = await fetch('/api/threads', { method: 'POST' });
-        if (!azureThreadRes.ok) throw new Error('Failed to create Azure thread');
-        const { thread_id: azureThreadId } = await azureThreadRes.json();
+        if (awsState) {
+          setAwsResult(awsState);
+          setArchitectureResult(awsState);
+        }
+        if (azureState) {
+          setAzureResult(azureState);
+        }
 
-        const azureState = await runSingleProvider(userProblem, 'azure', azureThreadId);
-        setAzureResult(azureState);
+        // Report any per-provider errors
+        const errors: string[] = [];
+        if (awsSettled.status === 'rejected')
+          errors.push(`AWS failed: ${awsSettled.reason}`);
+        if (azureSettled.status === 'rejected')
+          errors.push(`Azure failed: ${azureSettled.reason}`);
 
-        // Show completion
+        if (errors.length) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now() + 0.2,
+              role: 'assistant',
+              content: errors.join('\n'),
+            },
+          ]);
+        }
+
         setMessages((prev) => [
           ...prev,
           {
             id: Date.now() + 0.3,
             role: 'assistant',
             content:
-              'Both AWS and Azure architectures have been generated. Switch to the Compare view to see the side-by-side comparison.',
+              awsState && azureState
+                ? 'Both AWS and Azure architectures have been generated. Switch to the Compare view to see the side-by-side comparison.'
+                : 'Architecture generation finished with partial results. Check errors above.',
           },
         ]);
-        setRunStatus('completed');
+        setRunStatus(errors.length === 2 ? 'error' : 'completed');
       } else {
         // ── Single-provider mode ───────────────────────────────────
         const threadRes = await fetch('/api/threads', { method: 'POST' });
