@@ -217,3 +217,5 @@ outputs/
 
 # Environment files
 .env
+
+.langgraph_*.pckl
