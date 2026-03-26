@@ -20,6 +20,7 @@ graph run config construction, and comparison summary generation.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 import os
 from typing import Any
@@ -188,20 +189,30 @@ class ArchitectureService:
                 langsmith_project=langsmith_project,
             )
 
-        # ── "both" mode ────────────────────────────────────────────────
+        # ── "both" mode — run providers in parallel ──────────────────
         results: dict[str, Any] = {}
-        for provider_name in ("aws", "azure"):
-            if provider_name not in self._graphs:
-                continue
-            logger.info("Running %s pipeline…", provider_name.upper())
-            results[f"{provider_name}_result"] = self._run_single(
-                provider=provider_name,  # type: ignore[arg-type]
-                user_problem=user_problem,
-                min_iterations=min_iterations,
-                max_iterations=max_iterations,
-                thread_id=f"{thread_id or ''}-{provider_name}" if thread_id else None,
-                langsmith_project=langsmith_project,
-            )
+        providers = [p for p in ("aws", "azure") if p in self._graphs]
+
+        with ThreadPoolExecutor(max_workers=len(providers)) as pool:
+            futures = {
+                pool.submit(
+                    self._run_single,
+                    provider=pname,  # type: ignore[arg-type]
+                    user_problem=user_problem,
+                    min_iterations=min_iterations,
+                    max_iterations=max_iterations,
+                    thread_id=f"{thread_id or ''}-{pname}" if thread_id else None,
+                    langsmith_project=langsmith_project,
+                ): pname
+                for pname in providers
+            }
+            for future in as_completed(futures):
+                pname = futures[future]
+                try:
+                    results[f"{pname}_result"] = future.result()
+                    logger.info("%s pipeline completed.", pname.upper())
+                except Exception:
+                    logger.exception("%s pipeline failed.", pname.upper())
 
         results["comparison_summary"] = _build_comparison_summary(results)
         return results
