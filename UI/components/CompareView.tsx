@@ -1,103 +1,68 @@
+'use client';
+
 /**
- * CompareView — Side-by-side AWS vs Azure architecture comparison.
+ * CompareView — Side-by-side AWS vs Azure full architecture report.
  *
- * This component displays two columns (AWS and Azure) with per-domain
- * architecture summaries.  When a run has completed, it shows the actual
- * generated recommendations from the LangGraph pipeline.  When no results
- * are available, it displays default template descriptions from
- * `lib/compare.config.ts` as placeholder content.
- *
- * Each domain (compute, storage, network, database, security) is rendered
- * as a `SolutionCard` with an icon, title, and description.  The description
- * is truncated to 300 characters for readability in the comparison view.
+ * Renders the complete architecture_summary (markdown) for each provider
+ * using ReactMarkdown, mirroring the ArchitectureFullView rendering.
  */
-import { Server } from 'lucide-react';
-import type { ArchitectureState, ArchitectureDomainResult } from '@/lib/types';
-import { DOMAIN_ICONS, AWS_DEFAULTS, AZURE_DEFAULTS, DOMAINS } from '@/lib/compare.config';
-import React from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import type { ArchitectureState } from '@/lib/types';
 
 interface CompareViewProps {
   awsResult?: ArchitectureState | null;
   azureResult?: ArchitectureState | null;
 }
 
+function getReportContent(result?: ArchitectureState | null): string {
+  if (!result) return 'No architecture output available yet.';
+  if (result.architecture_summary) return result.architecture_summary;
+  if (result.final_architecture)
+    return JSON.stringify(result.final_architecture, null, 2);
+  return 'No architecture output available.';
+}
+
 export function CompareView({ awsResult, azureResult }: CompareViewProps) {
-  const awsComponents = awsResult?.architecture_components;
-  const azureComponents = azureResult?.architecture_components;
+  const awsContent = getReportContent(awsResult);
+  const azureContent = getReportContent(azureResult);
 
   return (
     <div className="w-full h-full flex gap-6 p-6 bg-slate-50 overflow-y-auto">
       {/* AWS Column */}
-      <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col">
+      <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col min-w-0">
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
           <h2 className="text-xl font-bold text-orange-600 flex items-center gap-2">
             AWS Architecture
           </h2>
           <span className="px-3 py-1 bg-orange-50 text-orange-600 text-xs font-semibold rounded-full border border-orange-100">
-            {awsComponents ? 'Generated Solution' : 'Default Template'}
+            {awsResult?.architecture_summary ? 'Generated Solution' : 'Awaiting Results'}
           </span>
         </div>
 
-        <div className="space-y-4 flex-1 overflow-y-auto pr-2">
-          {DOMAINS.map((domain) => (
-            <SolutionCard
-              key={domain}
-              icon={DOMAIN_ICONS[domain] || <Server className="w-5 h-5" />}
-              title={domain.charAt(0).toUpperCase() + domain.slice(1)}
-              desc={getDomainDescription(awsComponents?.[domain], AWS_DEFAULTS[domain])}
-            />
-          ))}
+        <div className="flex-1 overflow-y-auto pr-2">
+          <article className="prose prose-sm prose-slate max-w-none prose-headings:text-slate-800 prose-p:text-slate-600 prose-li:text-slate-600 prose-strong:text-slate-800 prose-code:text-indigo-600 prose-code:bg-indigo-50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-900 prose-pre:text-slate-100">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{awsContent}</ReactMarkdown>
+          </article>
         </div>
       </div>
 
       {/* Azure Column */}
-      <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col">
+      <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col min-w-0">
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
           <h2 className="text-xl font-bold text-blue-600 flex items-center gap-2">
             Azure Architecture
           </h2>
           <span className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-semibold rounded-full border border-blue-100">
-            {azureComponents ? 'Generated Solution' : 'Default Template'}
+            {azureResult?.architecture_summary ? 'Generated Solution' : 'Awaiting Results'}
           </span>
         </div>
 
-        <div className="space-y-4 flex-1 overflow-y-auto pr-2">
-          {DOMAINS.map((domain) => (
-            <SolutionCard
-              key={domain}
-              icon={DOMAIN_ICONS[domain] || <Server className="w-5 h-5" />}
-              title={domain.charAt(0).toUpperCase() + domain.slice(1)}
-              desc={getDomainDescription(azureComponents?.[domain], AZURE_DEFAULTS[domain])}
-            />
-          ))}
+        <div className="flex-1 overflow-y-auto pr-2">
+          <article className="prose prose-sm prose-slate max-w-none prose-headings:text-slate-800 prose-p:text-slate-600 prose-li:text-slate-600 prose-strong:text-slate-800 prose-code:text-indigo-600 prose-code:bg-indigo-50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-900 prose-pre:text-slate-100">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{azureContent}</ReactMarkdown>
+          </article>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function getDomainDescription(
-  component: ArchitectureDomainResult | undefined,
-  fallback: string,
-): string {
-  if (!component) return fallback;
-  if (typeof component.recommendations === 'string' && component.recommendations.trim()) {
-    // Take the first ~300 characters as a summary
-    const rec = component.recommendations.trim();
-    return rec.length > 300 ? rec.slice(0, 300) + '...' : rec;
-  }
-  return fallback;
-}
-
-function SolutionCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
-  return (
-    <div className="p-4 border border-slate-100 rounded-lg bg-slate-50/50 flex items-start gap-4 hover:bg-slate-50 transition-colors">
-      <div className="p-2 bg-white rounded-md shadow-sm text-slate-600 border border-slate-100 shrink-0">
-        {icon}
-      </div>
-      <div>
-        <h3 className="font-semibold text-slate-800 text-sm mb-1">{title}</h3>
-        <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{desc}</p>
       </div>
     </div>
   );
