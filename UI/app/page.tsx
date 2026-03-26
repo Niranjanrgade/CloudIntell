@@ -35,6 +35,8 @@ export default function Home() {
     messages,
     setMessages,
     architectureResult,
+    awsResult,
+    azureResult,
     startRun,
   } = useRunOrchestration();
 
@@ -59,7 +61,7 @@ export default function Home() {
                   architectures.
                 </p>
               </div>
-              <CompareView awsResult={architectureResult} azureResult={null} />
+              <CompareView awsResult={awsResult} azureResult={azureResult} />
             </div>
             <CopilotSidebar
               provider={viewMode}

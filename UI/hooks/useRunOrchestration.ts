@@ -38,6 +38,8 @@ export function useRunOrchestration() {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [architectureResult, setArchitectureResult] =
     useState<ArchitectureState | null>(null);
+  const [awsResult, setAwsResult] = useState<ArchitectureState | null>(null);
+  const [azureResult, setAzureResult] = useState<ArchitectureState | null>(null);
   const threadIdRef = useRef<string | null>(null);
   const msgIdRef = useRef(100);
   const timeoutIdsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -49,44 +51,24 @@ export function useRunOrchestration() {
     };
   }, []);
 
-  const startRun = useCallback(async (userProblem: string, provider: string = 'AWS') => {
-    const userMsg: ChatMessage = {
-      id: Date.now(),
-      role: 'user',
-      content: userProblem,
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setRunStatus('running');
-    setActiveNodes(new Set());
-    setCompletedNodes(new Set());
-    timeoutIdsRef.current.forEach(clearTimeout);
-    timeoutIdsRef.current = [];
-
-    try {
-      // 1. Create a thread
-      const threadRes = await fetch('/api/threads', { method: 'POST' });
-      if (!threadRes.ok) throw new Error('Failed to create thread');
-      const { thread_id } = await threadRes.json();
-      threadIdRef.current = thread_id;
-
-      // Show thread ID for LangSmith tracing
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 0.1,
-          role: 'assistant',
-          content: `Thread ID: ${thread_id} — use this to trace the run in LangSmith.`,
-        },
-      ]);
-
-      // 2. Start streaming run
+  const runSingleProvider = useCallback(
+    async (
+      userProblem: string,
+      cloudProvider: string,
+      threadId: string,
+    ): Promise<ArchitectureState | null> => {
+      // Start streaming run for a single provider
       const streamRes = await fetch('/api/runs/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ thread_id, user_problem: userProblem, cloud_provider: provider.toLowerCase() }),
+        body: JSON.stringify({
+          thread_id: threadId,
+          user_problem: userProblem,
+          cloud_provider: cloudProvider,
+        }),
       });
       if (!streamRes.ok || !streamRes.body)
-        throw new Error('Failed to start streaming run');
+        throw new Error(`Failed to start streaming run for ${cloudProvider.toUpperCase()}`);
 
       const reader = streamRes.body.getReader();
       const decoder = new TextDecoder();
@@ -157,7 +139,7 @@ export function useRunOrchestration() {
                 {
                   id: ++msgIdRef.current,
                   role: 'status',
-                  content: label,
+                  content: `[${cloudProvider.toUpperCase()}] ${label}`,
                 },
               ]);
 
@@ -168,28 +150,121 @@ export function useRunOrchestration() {
         }
       }
 
-      // 3. Fetch final state
-      if (threadIdRef.current) {
-        const stateRes = await fetch(
-          `/api/threads/${threadIdRef.current}/state`,
-        );
-        if (stateRes.ok) {
-          const fullState = await stateRes.json();
-          const values = (fullState.values || fullState) as ArchitectureState;
-          setArchitectureResult(values);
-          lastArchState = values;
-        }
+      // Fetch final state
+      const stateRes = await fetch(`/api/threads/${threadId}/state`);
+      if (stateRes.ok) {
+        const fullState = await stateRes.json();
+        const values = (fullState.values || fullState) as ArchitectureState;
+        lastArchState = values;
       }
 
-      // 4. Show final summary message
-      const summary =
-        lastArchState?.architecture_summary ||
-        'Architecture generation completed. Switch to the Compare view to see the results.';
-      setMessages((prev) => [
-        ...prev,
-        { id: Date.now(), role: 'assistant', content: summary },
-      ]);
-      setRunStatus('completed');
+      return lastArchState;
+    },
+    [],
+  );
+
+  const startRun = useCallback(async (userProblem: string, provider: string = 'AWS') => {
+    const userMsg: ChatMessage = {
+      id: Date.now(),
+      role: 'user',
+      content: userProblem,
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setRunStatus('running');
+    setActiveNodes(new Set());
+    setCompletedNodes(new Set());
+    setAwsResult(null);
+    setAzureResult(null);
+    timeoutIdsRef.current.forEach(clearTimeout);
+    timeoutIdsRef.current = [];
+
+    const isCompare = provider === 'Compare';
+
+    try {
+      if (isCompare) {
+        // ── Compare mode: run AWS then Azure sequentially ──────────
+        // AWS thread
+        const awsThreadRes = await fetch('/api/threads', { method: 'POST' });
+        if (!awsThreadRes.ok) throw new Error('Failed to create AWS thread');
+        const { thread_id: awsThreadId } = await awsThreadRes.json();
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 0.1,
+            role: 'assistant',
+            content: `Starting AWS pipeline (Thread: ${awsThreadId})…`,
+          },
+        ]);
+
+        const awsState = await runSingleProvider(userProblem, 'aws', awsThreadId);
+        setAwsResult(awsState);
+        setArchitectureResult(awsState);
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 0.2,
+            role: 'assistant',
+            content: 'AWS architecture generated. Starting Azure pipeline…',
+          },
+        ]);
+
+        // Reset node status for Azure run
+        setActiveNodes(new Set());
+
+        // Azure thread
+        const azureThreadRes = await fetch('/api/threads', { method: 'POST' });
+        if (!azureThreadRes.ok) throw new Error('Failed to create Azure thread');
+        const { thread_id: azureThreadId } = await azureThreadRes.json();
+
+        const azureState = await runSingleProvider(userProblem, 'azure', azureThreadId);
+        setAzureResult(azureState);
+
+        // Show completion
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 0.3,
+            role: 'assistant',
+            content:
+              'Both AWS and Azure architectures have been generated. Switch to the Compare view to see the side-by-side comparison.',
+          },
+        ]);
+        setRunStatus('completed');
+      } else {
+        // ── Single-provider mode ───────────────────────────────────
+        const threadRes = await fetch('/api/threads', { method: 'POST' });
+        if (!threadRes.ok) throw new Error('Failed to create thread');
+        const { thread_id } = await threadRes.json();
+        threadIdRef.current = thread_id;
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 0.1,
+            role: 'assistant',
+            content: `Thread ID: ${thread_id} — use this to trace the run in LangSmith.`,
+          },
+        ]);
+
+        const cloudProvider = provider.toLowerCase();
+        const result = await runSingleProvider(userProblem, cloudProvider, thread_id);
+        setArchitectureResult(result);
+
+        // Also populate the provider-specific result for Compare view
+        if (cloudProvider === 'aws') setAwsResult(result);
+        else if (cloudProvider === 'azure') setAzureResult(result);
+
+        const summary =
+          result?.architecture_summary ||
+          'Architecture generation completed. Switch to the Compare view to see the results.';
+        setMessages((prev) => [
+          ...prev,
+          { id: Date.now(), role: 'assistant', content: summary },
+        ]);
+        setRunStatus('completed');
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'An error occurred';
       setMessages((prev) => [
@@ -202,7 +277,7 @@ export function useRunOrchestration() {
       ]);
       setRunStatus('error');
     }
-  }, []);
+  }, [runSingleProvider]);
 
   return {
     runStatus,
@@ -211,6 +286,8 @@ export function useRunOrchestration() {
     messages,
     setMessages,
     architectureResult,
+    awsResult,
+    azureResult,
     startRun,
   };
 }
