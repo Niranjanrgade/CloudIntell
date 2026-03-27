@@ -91,7 +91,7 @@ export function CopilotSidebar({
 
   const containerClasses =
     variant === 'sidebar'
-      ? 'w-[28rem] bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full z-40 transition-all duration-300 ease-in-out'
+      ? 'w-[48rem] bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full z-40 transition-all duration-300 ease-in-out'
       : 'w-full h-72 bg-white border-t border-slate-200 shadow-2xl flex flex-col z-40 transition-all duration-300 ease-in-out';
 
   return (
@@ -205,24 +205,29 @@ export function CopilotSidebar({
 
       {/* Input */}
       <div className="p-4 border-t border-slate-100 bg-white">
-        <div className="relative flex items-center max-w-4xl mx-auto">
-          <input
-            type="text"
+        <div className="relative flex items-end max-w-4xl mx-auto">
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
             placeholder={
               runStatus === 'running'
                 ? 'Agents are working...'
                 : 'Describe your cloud architecture problem...'
             }
             disabled={runStatus === 'running'}
-            className="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all disabled:opacity-50"
+            rows={8}
+            className="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all disabled:opacity-50 resize-none"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || runStatus === 'running'}
-            className="absolute right-2 p-2 text-indigo-600 disabled:text-slate-300 hover:bg-indigo-50 rounded-lg transition-colors"
+            className="absolute right-2 bottom-2 p-2 text-indigo-600 disabled:text-slate-300 hover:bg-indigo-50 rounded-lg transition-colors"
           >
             <Send className="w-4 h-4" />
           </button>
