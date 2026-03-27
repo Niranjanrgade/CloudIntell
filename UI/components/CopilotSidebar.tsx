@@ -23,7 +23,7 @@ import { useState, useRef, useEffect, Dispatch, SetStateAction } from 'react';
 import { Send, Bot, User, Sparkles, X, Loader2, Activity, ExternalLink, FileText } from 'lucide-react';
 import type { RunStatus, ChatMessage, ArchitectureState } from '@/lib/types';
 
-export type ViewMode = 'AWS' | 'Azure' | 'Compare';
+export type ViewMode = 'AWS' | 'Azure' | 'Compare' | 'Debate';
 
 interface CopilotSidebarProps {
   provider: ViewMode;

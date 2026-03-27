@@ -31,6 +31,7 @@ __all__ = [
     "TaskDecomposition",
     "ValidationTask",
     "ValidationDecomposition",
+    "DebateArgument",
     "State",
 ]
 
@@ -93,6 +94,19 @@ class ValidationDecomposition(BaseModel):
     """
 
     validation_tasks: List[ValidationTask] = Field(description="List of domain-specific validation tasks")
+
+
+class DebateArgument(BaseModel):
+    """Schema for a single advocate's debate argument.
+
+    Used with ``with_structured_output()`` so the advocate LLM returns a
+    validated JSON structure that the debate round synthesizer can consume.
+    """
+
+    key_advantages: List[str] = Field(description="Key advantages of this provider's solution")
+    counterpoints: List[str] = Field(description="Counterpoints to the opposing provider's arguments")
+    evidence: List[str] = Field(description="Evidence from documentation, benchmarks, or case studies")
+    conclusion: str = Field(description="Concise conclusion summarizing why this provider is the better choice")
 
 
 # ── Reducer Functions ────────────────────────────────────────────────────────
@@ -246,3 +260,14 @@ class State(TypedDict):
     # ── Final output ────────────────────────────────────────────────────
     final_architecture: Annotated[Optional[Dict[str, Any]], last_value]  # Complete final architecture artifact dict.
     architecture_summary: Annotated[Optional[str], last_value]           # Polished text summary for display / CLI output.
+
+    # ── Debate mode artifacts ───────────────────────────────────────────
+    # Populated only when the debate graph runs.  Existing architecture
+    # generation graphs never write to these keys, so they are inert during
+    # normal (non-debate) runs.
+    aws_architecture_summary: Annotated[Optional[str], last_value]       # AWS solution text fed into the debate.
+    azure_architecture_summary: Annotated[Optional[str], last_value]     # Azure solution text fed into the debate.
+    debate_rounds: Annotated[List[Dict[str, Any]], append_list]          # List of {round, aws_argument, azure_argument}.
+    current_debate_round: Annotated[int, last_value]                     # Current debate round counter.
+    max_debate_rounds: Annotated[int, last_value]                        # Upper bound on debate rounds.
+    debate_summary: Annotated[Optional[str], last_value]                 # Judge's final verdict / recommendation.

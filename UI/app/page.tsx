@@ -20,6 +20,7 @@
 import { useState } from 'react';
 import { CopilotSidebar, ViewMode } from '@/components/CopilotSidebar';
 import { CompareView } from '@/components/CompareView';
+import { DebateView } from '@/components/DebateView';
 import { SidebarNavigator } from '@/components/SidebarNavigator';
 import { WorkflowGraph } from '@/components/WorkflowGraph';
 import { ArchitectureFullView } from '@/components/ArchitectureFullView';
@@ -37,6 +38,8 @@ export default function Home() {
     architectureResult,
     awsResult,
     azureResult,
+    debateResult,
+    debatePhase,
     startRun,
   } = useRunOrchestration();
 
@@ -47,9 +50,40 @@ export default function Home() {
 
       {/* Main Content Area */}
       <main
-        className={`flex flex-1 overflow-hidden ${viewMode === 'Compare' ? 'flex-col' : 'flex-row'}`}
+        className={`flex flex-1 overflow-hidden ${viewMode === 'Compare' || viewMode === 'Debate' ? 'flex-col' : 'flex-row'}`}
       >
-        {viewMode === 'Compare' ? (
+        {viewMode === 'Debate' ? (
+          <>
+            <div className="flex-1 relative overflow-hidden flex flex-col">
+              <div className="p-6 pb-0 z-10 bg-slate-50">
+                <h2 className="text-2xl font-bold text-slate-800">
+                  Debate Mode
+                </h2>
+                <p className="text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                  AWS and Azure advocates debate the merits of their platform
+                  for your architecture problem.
+                </p>
+              </div>
+              <DebateView
+                userProblem={debateResult ? undefined : undefined}
+                awsSummary={debateResult?.awsSummary}
+                azureSummary={debateResult?.azureSummary}
+                debateRounds={debateResult?.rounds}
+                debateSummary={debateResult?.summary}
+                isRunning={runStatus === 'running'}
+                debatePhase={debatePhase}
+              />
+            </div>
+            <CopilotSidebar
+              provider={viewMode}
+              variant="bottom"
+              onRunStart={startRun}
+              runStatus={runStatus}
+              messages={messages}
+              setMessages={setMessages}
+            />
+          </>
+        ) : viewMode === 'Compare' ? (
           <>
             <div className="flex-1 relative overflow-hidden flex flex-col">
               <div className="p-6 pb-0 z-10 bg-slate-50">

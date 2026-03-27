@@ -21,7 +21,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { RunStatus, ChatMessage, ArchitectureState } from '@/lib/types';
+import type { RunStatus, ChatMessage, ArchitectureState, DebateRound } from '@/lib/types';
 import { BACKEND_TO_UI_NODE, NODE_LABELS } from '@/lib/node-mapping';
 
 const WELCOME_MESSAGE: ChatMessage = {
@@ -40,6 +40,13 @@ export function useRunOrchestration() {
     useState<ArchitectureState | null>(null);
   const [awsResult, setAwsResult] = useState<ArchitectureState | null>(null);
   const [azureResult, setAzureResult] = useState<ArchitectureState | null>(null);
+  const [debateResult, setDebateResult] = useState<{
+    rounds: DebateRound[];
+    summary: string | null;
+    awsSummary: string | null;
+    azureSummary: string | null;
+  } | null>(null);
+  const [debatePhase, setDebatePhase] = useState<string>('idle');
   const threadIdRef = useRef<string | null>(null);
   const msgIdRef = useRef(100);
   const timeoutIdsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -175,13 +182,161 @@ export function useRunOrchestration() {
     setCompletedNodes(new Set());
     setAwsResult(null);
     setAzureResult(null);
+    setDebateResult(null);
+    setDebatePhase('idle');
     timeoutIdsRef.current.forEach(clearTimeout);
     timeoutIdsRef.current = [];
 
     const isCompare = provider === 'Compare';
+    const isDebate = provider === 'Debate';
 
     try {
-      if (isCompare) {
+      if (isDebate) {
+        // ── Debate mode: 3-phase flow ──────────────────────────────
+        setDebatePhase('generating');
+
+        // Phase A: Run AWS and Azure in parallel
+        const [awsThreadRes, azureThreadRes] = await Promise.all([
+          fetch('/api/threads', { method: 'POST' }),
+          fetch('/api/threads', { method: 'POST' }),
+        ]);
+        if (!awsThreadRes.ok) throw new Error('Failed to create AWS thread');
+        if (!azureThreadRes.ok) throw new Error('Failed to create Azure thread');
+
+        const [{ thread_id: awsThreadId }, { thread_id: azureThreadId }] =
+          await Promise.all([awsThreadRes.json(), azureThreadRes.json()]);
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 0.1,
+            role: 'assistant',
+            content: `Phase 1: Generating AWS and Azure architectures in parallel…`,
+          },
+        ]);
+
+        const [awsSettled, azureSettled] = await Promise.allSettled([
+          runSingleProvider(userProblem, 'aws', awsThreadId),
+          runSingleProvider(userProblem, 'azure', azureThreadId),
+        ]);
+
+        const awsState = awsSettled.status === 'fulfilled' ? awsSettled.value : null;
+        const azureState = azureSettled.status === 'fulfilled' ? azureSettled.value : null;
+
+        if (awsState) { setAwsResult(awsState); setArchitectureResult(awsState); }
+        if (azureState) setAzureResult(azureState);
+
+        // Check both succeeded before debating
+        if (!awsState?.architecture_summary || !azureState?.architecture_summary) {
+          const errors: string[] = [];
+          if (awsSettled.status === 'rejected') errors.push(`AWS failed: ${awsSettled.reason}`);
+          if (azureSettled.status === 'rejected') errors.push(`Azure failed: ${azureSettled.reason}`);
+          if (!awsState?.architecture_summary) errors.push('AWS architecture summary missing.');
+          if (!azureState?.architecture_summary) errors.push('Azure architecture summary missing.');
+          setMessages((prev) => [
+            ...prev,
+            { id: Date.now() + 0.2, role: 'assistant', content: `Cannot start debate: ${errors.join(' ')}` },
+          ]);
+          setDebatePhase('idle');
+          setRunStatus('error');
+          return;
+        }
+
+        // Phase B: Start debate
+        setDebatePhase('debating');
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 0.3,
+            role: 'assistant',
+            content: 'Phase 2: Both architectures generated. Starting AWS vs Azure debate…',
+          },
+        ]);
+
+        const debateThreadRes = await fetch('/api/threads', { method: 'POST' });
+        if (!debateThreadRes.ok) throw new Error('Failed to create debate thread');
+        const { thread_id: debateThreadId } = await debateThreadRes.json();
+
+        // Phase C: Stream the debate graph
+        const debateStreamRes = await fetch('/api/runs/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            thread_id: debateThreadId,
+            user_problem: userProblem,
+            cloud_provider: 'debate',
+            aws_architecture_summary: awsState.architecture_summary,
+            azure_architecture_summary: azureState.architecture_summary,
+          }),
+        });
+
+        if (!debateStreamRes.ok || !debateStreamRes.body)
+          throw new Error('Failed to start debate streaming run');
+
+        const reader = debateStreamRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.replace(/^data: /, '').trim();
+            if (!trimmed || trimmed === '[DONE]') continue;
+
+            let parsed: { event: string; data: unknown };
+            try { parsed = JSON.parse(trimmed); } catch { continue; }
+
+            if (parsed.event === 'error') {
+              const errData = parsed.data as { message?: string };
+              throw new Error(errData.message || 'Debate stream error');
+            }
+
+            if (parsed.event === 'updates' && parsed.data && typeof parsed.data === 'object') {
+              const updates = parsed.data as Record<string, Partial<ArchitectureState>>;
+              for (const nodeName of Object.keys(updates)) {
+                const label = NODE_LABELS[nodeName] || nodeName;
+                setMessages((prev) => [
+                  ...prev,
+                  { id: ++msgIdRef.current, role: 'status', content: `[DEBATE] ${label}` },
+                ]);
+
+                // Track when judge is running
+                if (nodeName === 'debate_judge') setDebatePhase('judging');
+              }
+            }
+          }
+        }
+
+        // Fetch final debate state
+        const debateStateRes = await fetch(`/api/threads/${debateThreadId}/state`);
+        if (debateStateRes.ok) {
+          const fullState = await debateStateRes.json();
+          const values = (fullState.values || fullState) as ArchitectureState;
+          setDebateResult({
+            rounds: values.debate_rounds || [],
+            summary: values.debate_summary || null,
+            awsSummary: awsState.architecture_summary,
+            azureSummary: azureState.architecture_summary,
+          });
+        }
+
+        setDebatePhase('completed');
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 0.4,
+            role: 'assistant',
+            content: 'Debate completed! The judge has rendered a verdict. See the Debate view for full results.',
+          },
+        ]);
+        setRunStatus('completed');
+      } else if (isCompare) {
         // ── Compare mode: run AWS and Azure in parallel ────────────
         const [awsThreadRes, azureThreadRes] = await Promise.all([
           fetch('/api/threads', { method: 'POST' }),
@@ -307,6 +462,8 @@ export function useRunOrchestration() {
     architectureResult,
     awsResult,
     azureResult,
+    debateResult,
+    debatePhase,
     startRun,
   };
 }

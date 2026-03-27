@@ -6,6 +6,7 @@
   "env": ".env",
   "graphs": {
     "cloudy-intell": "./langgraph_app.py:graph",
-    "cloudy-intell-azure": "./langgraph_app.py:azure_graph"
+    "cloudy-intell-azure": "./langgraph_app.py:azure_graph",
+    "cloudy-intell-debate": "./langgraph_app.py:debate_graph"
   }
 }

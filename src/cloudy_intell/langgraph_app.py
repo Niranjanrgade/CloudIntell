@@ -19,6 +19,7 @@ from cloudy_intell.agents.context import RuntimeContext
 from cloudy_intell.config.provider_meta import get_provider_meta
 from cloudy_intell.config.settings import get_settings
 from cloudy_intell.graph.builder import build_graph
+from cloudy_intell.graph.debate_graph import build_debate_graph
 from cloudy_intell.infrastructure.llm_factory import create_execution_llm, create_reasoning_llm
 from cloudy_intell.infrastructure.logging_utils import configure_logging
 from cloudy_intell.infrastructure.tools import create_tool_bundle
@@ -38,7 +39,11 @@ def _init_shared():
 
 
 def _build_provider_graph(settings, mini_llm, reasoning_llm, provider_name):
-    """Build a compiled graph for the given cloud provider."""
+    """Build a compiled graph for the given cloud provider.
+
+    Returns a (RuntimeContext, compiled_graph) tuple so the context can be
+    reused by the debate graph which needs both provider contexts.
+    """
     meta = get_provider_meta(provider_name)
     vector_store = create_vector_store(settings, provider=provider_name)
     tools = create_tool_bundle(mini_llm, vector_store, provider_meta=meta)
@@ -51,10 +56,14 @@ def _build_provider_graph(settings, mini_llm, reasoning_llm, provider_name):
         provider=meta,
     )
     # LangGraph API dev mode manages persistence automatically.
-    return build_graph(ctx)
+    return ctx, build_graph(ctx)
 
 
 # LangGraph CLI loads these symbols from langgraph.json.
 _settings, _mini_llm, _reasoning_llm = _init_shared()
-graph = _build_provider_graph(_settings, _mini_llm, _reasoning_llm, "aws")
-azure_graph = _build_provider_graph(_settings, _mini_llm, _reasoning_llm, "azure")
+
+_aws_ctx, graph = _build_provider_graph(_settings, _mini_llm, _reasoning_llm, "aws")
+_azure_ctx, azure_graph = _build_provider_graph(_settings, _mini_llm, _reasoning_llm, "azure")
+
+# Debate graph uses both provider contexts for advocate tool access.
+debate_graph = build_debate_graph(_aws_ctx, _azure_ctx)

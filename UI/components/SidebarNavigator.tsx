@@ -9,7 +9,7 @@
  * Also includes a Settings button (currently a placeholder for future
  * configuration options like model selection, iteration bounds, etc.).
  */
-import { Cloud, Columns, Settings, Server } from 'lucide-react';
+import { Cloud, Columns, Settings, Server, Swords } from 'lucide-react';
 import { ViewMode } from './CopilotSidebar';
 
 export function SidebarNavigator({ viewMode, setViewMode }: { viewMode: ViewMode, setViewMode: (mode: ViewMode) => void }) {
@@ -53,6 +53,13 @@ export function SidebarNavigator({ viewMode, setViewMode }: { viewMode: ViewMode
           active={viewMode === 'Compare'} 
           onClick={() => setViewMode('Compare')} 
           activeColor="bg-indigo-600"
+        />
+        <NavItem 
+          icon={<Swords className="w-5 h-5" />} 
+          label="Debate Mode" 
+          active={viewMode === 'Debate'} 
+          onClick={() => setViewMode('Debate')} 
+          activeColor="bg-purple-600"
         />
       </nav>
       

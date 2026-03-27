@@ -27,12 +27,18 @@ export async function POST(req: NextRequest) {
       cloud_provider = 'aws',
       min_iterations = 1,
       max_iterations = 3,
+      aws_architecture_summary,
+      azure_architecture_summary,
+      max_debate_rounds = 2,
     } = body as {
       thread_id: string;
       user_problem: string;
       cloud_provider?: string;
       min_iterations?: number;
       max_iterations?: number;
+      aws_architecture_summary?: string;
+      azure_architecture_summary?: string;
+      max_debate_rounds?: number;
     };
 
     if (!thread_id || !user_problem) {
@@ -44,27 +50,67 @@ export async function POST(req: NextRequest) {
 
     const client = getLanggraphClient();
 
-    // Build initial input matching create_initial_state() from the backend
-    const input = {
-      messages: [{ role: 'human', content: user_problem }],
-      user_problem,
-      iteration_count: 0,
-      min_iterations,
-      max_iterations,
-      architecture_domain_tasks: {},
-      architecture_components: {},
-      proposed_architecture: {},
-      validation_feedback: [],
-      validation_summary: null,
-      audit_feedback: [],
-      factual_errors_exist: false,
-      design_flaws_exist: false,
-      final_architecture: null,
-      architecture_summary: null,
-    };
+    // Build initial input depending on graph type
+    const isDebate = cloud_provider === 'debate';
+
+    const input = isDebate
+      ? {
+          messages: [{ role: 'human', content: user_problem }],
+          user_problem,
+          iteration_count: 0,
+          min_iterations: 0,
+          max_iterations: 0,
+          architecture_domain_tasks: {},
+          architecture_components: {},
+          proposed_architecture: {},
+          validation_feedback: [],
+          validation_summary: null,
+          audit_feedback: [],
+          factual_errors_exist: false,
+          design_flaws_exist: false,
+          final_architecture: null,
+          architecture_summary: null,
+          aws_architecture_summary: aws_architecture_summary || null,
+          azure_architecture_summary: azure_architecture_summary || null,
+          debate_rounds: [],
+          current_debate_round: 0,
+          max_debate_rounds,
+          debate_summary: null,
+        }
+      : {
+          messages: [{ role: 'human', content: user_problem }],
+          user_problem,
+          iteration_count: 0,
+          min_iterations,
+          max_iterations,
+          architecture_domain_tasks: {},
+          architecture_components: {},
+          proposed_architecture: {},
+          validation_feedback: [],
+          validation_summary: null,
+          audit_feedback: [],
+          factual_errors_exist: false,
+          design_flaws_exist: false,
+          final_architecture: null,
+          architecture_summary: null,
+          // Debate fields — inert defaults for non-debate runs
+          aws_architecture_summary: null,
+          azure_architecture_summary: null,
+          debate_rounds: [],
+          current_debate_round: 0,
+          max_debate_rounds: 2,
+          debate_summary: null,
+        };
 
     // Select the correct graph based on cloud provider
-    const graphName = cloud_provider === 'azure' ? 'cloudy-intell-azure' : 'cloudy-intell';
+    let graphName: string;
+    if (isDebate) {
+      graphName = 'cloudy-intell-debate';
+    } else if (cloud_provider === 'azure') {
+      graphName = 'cloudy-intell-azure';
+    } else {
+      graphName = 'cloudy-intell';
+    }
 
     // Stream the run with "updates" mode so we see per-node state deltas
     const streamResponse = client.runs.stream(thread_id, graphName, {
