@@ -221,7 +221,7 @@ export function CopilotSidebar({
                 : 'Describe your cloud architecture problem...'
             }
             disabled={runStatus === 'running'}
-            rows={8}
+            rows={variant === 'bottom' ? 3 : 8}
             className="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all disabled:opacity-50 resize-none"
           />
           <button
