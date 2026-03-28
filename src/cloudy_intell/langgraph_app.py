@@ -20,6 +20,7 @@ from cloudy_intell.config.provider_meta import get_provider_meta
 from cloudy_intell.config.settings import get_settings
 from cloudy_intell.graph.builder import build_graph
 from cloudy_intell.graph.debate_graph import build_debate_graph
+from cloudy_intell.graph.iac_graph import build_iac_graph
 from cloudy_intell.infrastructure.llm_factory import create_execution_llm, create_reasoning_llm
 from cloudy_intell.infrastructure.logging_utils import configure_logging
 from cloudy_intell.infrastructure.tools import create_tool_bundle
@@ -67,3 +68,7 @@ _azure_ctx, azure_graph = _build_provider_graph(_settings, _mini_llm, _reasoning
 
 # Debate graph uses both provider contexts for advocate tool access.
 debate_graph = build_debate_graph(_aws_ctx, _azure_ctx)
+
+# IaC generation graphs — one per provider, invoked on-demand after report view.
+iac_graph = build_iac_graph(_aws_ctx)
+iac_graph_azure = build_iac_graph(_azure_ctx)

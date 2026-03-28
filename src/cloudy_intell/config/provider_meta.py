@@ -15,7 +15,7 @@ accidental mutation during parallel node execution.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, field
 from typing import Literal
 
 ProviderName = Literal["aws", "azure"]
@@ -46,6 +46,8 @@ class ProviderMeta:
     domain_services: dict[str, str]
     validation_checks: dict[str, str]
     rag_tool_description: str
+    supported_iac_formats: tuple[str, ...] = ()
+    iac_resource_hints: dict[str, str] = field(default_factory=dict)
 
 
 # ── AWS ─────────────────────────────────────────────────────────────────────
@@ -97,6 +99,13 @@ AWS_META = ProviderMeta(
         "Search AWS documentation vector database for accurate, up-to-date "
         "information about AWS services, configurations, and best practices."
     ),
+    supported_iac_formats=("terraform", "cloudformation"),
+    iac_resource_hints={
+        "compute": "aws_instance, aws_lambda_function, aws_ecs_service, aws_ecs_cluster, aws_eks_cluster, aws_autoscaling_group, aws_launch_template",
+        "network": "aws_vpc, aws_subnet, aws_security_group, aws_lb, aws_lb_target_group, aws_route_table, aws_cloudfront_distribution, aws_route53_zone, aws_route53_record, aws_nat_gateway, aws_internet_gateway",
+        "storage": "aws_s3_bucket, aws_s3_bucket_policy, aws_ebs_volume, aws_efs_file_system, aws_glacier_vault",
+        "database": "aws_db_instance, aws_dynamodb_table, aws_elasticache_cluster, aws_rds_cluster, aws_elasticache_replication_group",
+    },
 )
 
 # ── Azure ───────────────────────────────────────────────────────────────────
@@ -148,6 +157,13 @@ AZURE_META = ProviderMeta(
         "Search Azure documentation vector database for accurate, up-to-date "
         "information about Azure services, configurations, and best practices."
     ),
+    supported_iac_formats=("terraform", "bicep"),
+    iac_resource_hints={
+        "compute": "azurerm_virtual_machine, azurerm_function_app, azurerm_kubernetes_cluster, azurerm_container_app, azurerm_linux_virtual_machine_scale_set",
+        "network": "azurerm_virtual_network, azurerm_subnet, azurerm_network_security_group, azurerm_lb, azurerm_application_gateway, azurerm_cdn_frontdoor_profile, azurerm_dns_zone, azurerm_nat_gateway, azurerm_public_ip",
+        "storage": "azurerm_storage_account, azurerm_storage_container, azurerm_managed_disk, azurerm_storage_share",
+        "database": "azurerm_mssql_server, azurerm_mssql_database, azurerm_cosmosdb_account, azurerm_redis_cache, azurerm_postgresql_flexible_server",
+    },
 )
 
 # ── Registry ────────────────────────────────────────────────────────────────

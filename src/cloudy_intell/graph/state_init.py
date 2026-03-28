@@ -67,6 +67,11 @@ def create_initial_state(
         # Model selection — per-run overrides (None = use defaults).
         "reasoning_model": reasoning_model,
         "execution_model": execution_model,
+        # IaC generation — inert defaults for non-IaC runs.
+        "iac_format": None,
+        "architecture_input": None,
+        "iac_domain_code": {},
+        "iac_output": None,
     }
 
 
@@ -118,4 +123,9 @@ def create_debate_initial_state(
         # Model selection — per-run overrides (None = use defaults).
         "reasoning_model": None,
         "execution_model": None,
+        # IaC generation — inert defaults for non-IaC runs.
+        "iac_format": None,
+        "architecture_input": None,
+        "iac_domain_code": {},
+        "iac_output": None,
     }

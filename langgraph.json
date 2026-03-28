@@ -7,6 +7,8 @@
   "graphs": {
     "cloudy-intell": "./langgraph_app.py:graph",
     "cloudy-intell-azure": "./langgraph_app.py:azure_graph",
-    "cloudy-intell-debate": "./langgraph_app.py:debate_graph"
+    "cloudy-intell-debate": "./langgraph_app.py:debate_graph",
+    "cloudy-intell-iac": "./langgraph_app.py:iac_graph",
+    "cloudy-intell-iac-azure": "./langgraph_app.py:iac_graph_azure"
   }
 }

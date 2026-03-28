@@ -25,8 +25,11 @@ import { DebateWorkflowGraph } from '@/components/DebateWorkflowGraph';
 import { SidebarNavigator } from '@/components/SidebarNavigator';
 import { WorkflowGraph } from '@/components/WorkflowGraph';
 import { ArchitectureFullView } from '@/components/ArchitectureFullView';
+import { IaCGenerationPanel } from '@/components/IaCGenerationPanel';
+import { IaCCodeView } from '@/components/IaCCodeView';
 import { useRunOrchestration } from '@/hooks/useRunOrchestration';
-import type { ModelInfo } from '@/lib/types';
+import { useIaCGeneration } from '@/hooks/useIaCGeneration';
+import type { ModelInfo, IaCFormat } from '@/lib/types';
 
 export default function Home() {
   // ── Local UI state ────────────────────────────────────────────────────────
@@ -53,6 +56,18 @@ export default function Home() {
       .then((data: ModelInfo[]) => setModels(data))
       .catch(() => {});
   }, []);
+
+  // ── IaC generation state ───────────────────────────────────────────────
+  const {
+    iacStatus,
+    iacOutput,
+    iacFormat,
+    iacError,
+    iacProgress,
+    generateIaC,
+    resetIaC,
+  } = useIaCGeneration();
+  const [showIaCView, setShowIaCView] = useState(false);
 
   // ── Run orchestration hook ────────────────────────────────────────────────
   // `useRunOrchestration` is the central hook that manages the entire
@@ -204,18 +219,57 @@ export default function Home() {
         ) : (
           /* ── Single Provider View (AWS / Azure) ────────────────────────
                Two-panel horizontal layout:
-               Left:  React Flow graph OR full architecture report overlay
+               Left:  React Flow graph OR full architecture report overlay OR IaC code view
                Right: CopilotSidebar (chat interface) */
           <>
-            {/* Conditionally show the full report overlay or the React Flow graph.
-                The report is shown when the user clicks "View Full Architecture Report"
-                in the sidebar after a run completes. */}
-            {showFullReport && architectureResult ? (
-              // Full-screen architecture report rendered as styled markdown
-              <ArchitectureFullView
-                result={architectureResult}
-                onBack={() => setShowFullReport(false)}
+            {/* Conditionally show IaC code view, full report, or React Flow graph.
+                Priority: IaC code view > full report > graph */}
+            {showIaCView && iacOutput && iacFormat ? (
+              <IaCCodeView
+                iacOutput={iacOutput}
+                iacFormat={iacFormat}
+                onBack={() => setShowIaCView(false)}
               />
+            ) : showFullReport && architectureResult ? (
+              // Full-screen architecture report with IaC generation panel at bottom
+              <div className="flex-1 h-full flex flex-col overflow-hidden">
+                <ArchitectureFullView
+                  result={architectureResult}
+                  onBack={() => { setShowFullReport(false); resetIaC(); }}
+                />
+                {/* IaC generation panel — shown at the bottom of the report */}
+                {runStatus === 'completed' && (
+                  <IaCGenerationPanel
+                    cloudProvider={viewMode}
+                    iacStatus={iacStatus}
+                    iacProgress={iacProgress}
+                    onGenerate={(format: IaCFormat) => {
+                      const summary = architectureResult.architecture_summary || '';
+                      generateIaC(summary, format, viewMode, modelOverrides);
+                    }}
+                  />
+                )}
+                {/* Show button to view IaC code when generation completes */}
+                {iacStatus === 'completed' && iacOutput && (
+                  <div className="border-t border-emerald-200 bg-emerald-50/80 px-6 py-2.5 shrink-0 flex items-center justify-between">
+                    <span className="text-sm text-emerald-700 font-medium">
+                      Infrastructure code generated successfully!
+                    </span>
+                    <button
+                      onClick={() => setShowIaCView(true)}
+                      className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-sm"
+                    >
+                      View Generated Code
+                    </button>
+                  </div>
+                )}
+                {/* Show error if IaC generation failed */}
+                {iacStatus === 'error' && iacError && (
+                  <div className="border-t border-red-200 bg-red-50/80 px-6 py-2.5 shrink-0">
+                    <span className="text-sm text-red-700">Error: {iacError}</span>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="flex-1 h-full relative flex flex-col">
                 {/* Header Overlay — floats on top of the React Flow canvas.

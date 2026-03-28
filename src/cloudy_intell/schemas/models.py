@@ -278,3 +278,12 @@ class State(TypedDict):
     # from ``llm_factory`` to honour these values.
     reasoning_model: Annotated[Optional[str], last_value]                # e.g. "gpt-5", "claude-opus-4-20250514"
     execution_model: Annotated[Optional[str], last_value]                # e.g. "gpt-4o-mini", "gemini-2.5-flash"
+
+    # ── IaC generation artifacts ────────────────────────────────────────
+    # Populated only when the IaC generation graph runs.  The IaC graph
+    # accepts a completed architecture summary and generates infrastructure
+    # code in the requested format.
+    iac_format: Annotated[Optional[str], last_value]                     # "terraform" | "cloudformation" | "bicep"
+    architecture_input: Annotated[Optional[str], last_value]             # Architecture summary passed as input to IaC graph.
+    iac_domain_code: Annotated[Dict[str, Dict[str, Any]], merge_dicts]   # Per-domain IaC code from parallel generators.
+    iac_output: Annotated[Optional[str], last_value]                     # Final merged IaC code document.

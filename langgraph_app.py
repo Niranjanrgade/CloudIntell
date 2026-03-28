@@ -12,4 +12,4 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from cloudy_intell.langgraph_app import graph, azure_graph, debate_graph
+from cloudy_intell.langgraph_app import graph, azure_graph, debate_graph, iac_graph, iac_graph_azure
