@@ -94,6 +94,7 @@ export function useRunOrchestration() {
       userProblem: string,
       cloudProvider: string,
       threadId: string,
+      modelOverrides?: { reasoning_model?: string; execution_model?: string },
     ): Promise<ArchitectureState | null> => {
       // ── Step 1: Initiate the streaming run ────────────────────────────
       // POST to the Next.js API route which proxies to the LangGraph backend.
@@ -104,6 +105,8 @@ export function useRunOrchestration() {
           thread_id: threadId,
           user_problem: userProblem,
           cloud_provider: cloudProvider,
+          ...(modelOverrides?.reasoning_model && { reasoning_model: modelOverrides.reasoning_model }),
+          ...(modelOverrides?.execution_model && { execution_model: modelOverrides.execution_model }),
         }),
       });
       if (!streamRes.ok || !streamRes.body)
@@ -236,7 +239,11 @@ export function useRunOrchestration() {
    * @param userProblem  The user's cloud architecture problem description.
    * @param provider     'AWS' | 'Azure' | 'Compare' | 'Debate' — determines the execution mode.
    */
-  const startRun = useCallback(async (userProblem: string, provider: string = 'AWS') => {
+  const startRun = useCallback(async (
+    userProblem: string,
+    provider: string = 'AWS',
+    modelOverrides?: { reasoning_model?: string; execution_model?: string },
+  ) => {
     // Add the user's message to the chat immediately for visual feedback
     const userMsg: ChatMessage = {
       id: Date.now(),
@@ -295,8 +302,8 @@ export function useRunOrchestration() {
         // Run both providers concurrently — each calls runSingleProvider which
         // handles the full SSE streaming, node status updates, and state fetching.
         const [awsSettled, azureSettled] = await Promise.allSettled([
-          runSingleProvider(userProblem, 'aws', awsThreadId),
-          runSingleProvider(userProblem, 'azure', azureThreadId),
+          runSingleProvider(userProblem, 'aws', awsThreadId, modelOverrides),
+          runSingleProvider(userProblem, 'azure', azureThreadId, modelOverrides),
         ]);
 
         // Extract results from settled promises
@@ -353,6 +360,8 @@ export function useRunOrchestration() {
             cloud_provider: 'debate',
             aws_architecture_summary: awsState.architecture_summary,
             azure_architecture_summary: azureState.architecture_summary,
+            ...(modelOverrides?.reasoning_model && { reasoning_model: modelOverrides.reasoning_model }),
+            ...(modelOverrides?.execution_model && { execution_model: modelOverrides.execution_model }),
           }),
         });
 
@@ -451,8 +460,8 @@ export function useRunOrchestration() {
         // Run both provider pipelines concurrently using Promise.allSettled.
         // allSettled (not all) so a failure in one provider doesn't cancel the other.
         const [awsSettled, azureSettled] = await Promise.allSettled([
-          runSingleProvider(userProblem, 'aws', awsThreadId),
-          runSingleProvider(userProblem, 'azure', azureThreadId),
+          runSingleProvider(userProblem, 'aws', awsThreadId, modelOverrides),
+          runSingleProvider(userProblem, 'azure', azureThreadId, modelOverrides),
         ]);
 
         const awsState =
@@ -519,7 +528,7 @@ export function useRunOrchestration() {
 
         // Run the single provider pipeline
         const cloudProvider = provider.toLowerCase();
-        const result = await runSingleProvider(userProblem, cloudProvider, thread_id);
+        const result = await runSingleProvider(userProblem, cloudProvider, thread_id, modelOverrides);
         setArchitectureResult(result);
 
         // Also store the result under the specific provider key so it's

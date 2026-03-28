@@ -104,3 +104,19 @@ def create_tool_bundle(
         llm_with_web_tools=base_llm.bind_tools([tool_web_search]),
         llm_with_rag_tools=base_llm.bind_tools([tool_rag_search]),
     )
+
+
+def rebind_tools(bundle: ToolBundle, new_llm) -> ToolBundle:
+    """Return a new ``ToolBundle`` with the same tools but bound to *new_llm*.
+
+    This allows per-run model overrides without rebuilding the underlying
+    Tool objects (web search, RAG search) which are provider-specific.
+    """
+
+    return ToolBundle(
+        web_search=bundle.web_search,
+        rag_search=bundle.rag_search,
+        llm_with_all_tools=new_llm.bind_tools([bundle.web_search, bundle.rag_search]),
+        llm_with_web_tools=new_llm.bind_tools([bundle.web_search]),
+        llm_with_rag_tools=new_llm.bind_tools([bundle.rag_search]),
+    )

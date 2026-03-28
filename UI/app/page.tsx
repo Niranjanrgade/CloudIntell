@@ -17,7 +17,7 @@
  */
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CopilotSidebar, ViewMode } from '@/components/CopilotSidebar';
 import { CompareView } from '@/components/CompareView';
 import { DebateView } from '@/components/DebateView';
@@ -25,6 +25,7 @@ import { SidebarNavigator } from '@/components/SidebarNavigator';
 import { WorkflowGraph } from '@/components/WorkflowGraph';
 import { ArchitectureFullView } from '@/components/ArchitectureFullView';
 import { useRunOrchestration } from '@/hooks/useRunOrchestration';
+import type { ModelInfo } from '@/lib/types';
 
 export default function Home() {
   // ── Local UI state ────────────────────────────────────────────────────────
@@ -36,6 +37,18 @@ export default function Home() {
   // Controls whether to show the full architecture report overlay instead of
   // the React Flow graph (only applicable in single-provider AWS/Azure mode).
   const [showFullReport, setShowFullReport] = useState(false);
+
+  // ── Model selection state ──────────────────────────────────────────────
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [reasoningModel, setReasoningModel] = useState('gpt-5');
+  const [executionModel, setExecutionModel] = useState('gpt-4o-mini');
+
+  useEffect(() => {
+    fetch('/api/models')
+      .then((res) => res.json())
+      .then((data: ModelInfo[]) => setModels(data))
+      .catch(() => {});
+  }, []);
 
   // ── Run orchestration hook ────────────────────────────────────────────────
   // `useRunOrchestration` is the central hook that manages the entire
@@ -61,6 +74,8 @@ export default function Home() {
     startRun,
   } = useRunOrchestration();
 
+  const modelOverrides = { reasoning_model: reasoningModel, execution_model: executionModel };
+
   return (
     // Root container: full-screen horizontal flex layout
     <div className="flex h-screen w-full overflow-hidden bg-slate-50">
@@ -68,7 +83,15 @@ export default function Home() {
       {/* ── Left Sidebar Navigator ─────────────────────────────────────────
            Fixed-width dark sidebar with nav buttons for AWS, Azure, Compare,
            and Debate modes.  Passes viewMode and setter to allow switching. */}
-      <SidebarNavigator viewMode={viewMode} setViewMode={setViewMode} />
+      <SidebarNavigator
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        models={models}
+        reasoningModel={reasoningModel}
+        executionModel={executionModel}
+        onReasoningModelChange={setReasoningModel}
+        onExecutionModelChange={setExecutionModel}
+      />
 
       {/* ── Main Content Area ──────────────────────────────────────────────
            Layout direction changes based on view mode:
@@ -115,6 +138,7 @@ export default function Home() {
               runStatus={runStatus}
               messages={messages}
               setMessages={setMessages}
+              modelOverrides={modelOverrides}
             />
           </>
         ) : viewMode === 'Compare' ? (
@@ -145,6 +169,7 @@ export default function Home() {
               runStatus={runStatus}
               messages={messages}
               setMessages={setMessages}
+              modelOverrides={modelOverrides}
             />
           </>
         ) : (
@@ -203,6 +228,7 @@ export default function Home() {
               setMessages={setMessages}
               architectureResult={architectureResult}
               onViewFullReport={() => setShowFullReport(true)}
+              modelOverrides={modelOverrides}
             />
           </>
         )}

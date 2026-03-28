@@ -271,3 +271,10 @@ class State(TypedDict):
     current_debate_round: Annotated[int, last_value]                     # Current debate round counter.
     max_debate_rounds: Annotated[int, last_value]                        # Upper bound on debate rounds.
     debate_summary: Annotated[Optional[str], last_value]                 # Judge's final verdict / recommendation.
+
+    # ── Model selection (per-run overrides) ─────────────────────────────
+    # When set, these override the default models from AppSettings for this
+    # run.  Nodes use ``resolve_reasoning_llm`` / ``resolve_execution_llm``
+    # from ``llm_factory`` to honour these values.
+    reasoning_model: Annotated[Optional[str], last_value]                # e.g. "gpt-5", "claude-opus-4-20250514"
+    execution_model: Annotated[Optional[str], last_value]                # e.g. "gpt-4o-mini", "gemini-2.5-flash"

@@ -28,7 +28,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from cloudy_intell.agents.context import RuntimeContext
 from cloudy_intell.agents.tool_execution import execute_tool_calls
+from cloudy_intell.infrastructure.llm_factory import resolve_execution_llm, resolve_reasoning_llm
 from cloudy_intell.infrastructure.logging_utils import get_logger
+from cloudy_intell.infrastructure.tools import rebind_tools
 from cloudy_intell.schemas.models import State
 
 logger = get_logger(__name__)
@@ -162,10 +164,12 @@ Structure your argument with: Counterpoints to Azure, Additional Evidence, Conce
         ]
 
         try:
+            exec_llm = resolve_execution_llm(aws_ctx, state)
+            tools = aws_ctx.tools if exec_llm is aws_ctx.mini_llm else rebind_tools(aws_ctx.tools, exec_llm)
             response = execute_tool_calls(
                 messages,
-                aws_ctx.tools.llm_with_all_tools,
-                {"web_search": aws_ctx.tools.web_search, "RAG_search": aws_ctx.tools.rag_search},
+                tools.llm_with_all_tools,
+                {"web_search": tools.web_search, "RAG_search": tools.rag_search},
                 max_iterations=aws_ctx.settings.tool_max_iterations,
                 timeout=aws_ctx.settings.tool_timeout_seconds,
                 retry_attempts=aws_ctx.settings.llm_retry_attempts,
@@ -259,10 +263,12 @@ Structure your argument with: Counterpoints to AWS, Additional Evidence, Concess
         ]
 
         try:
+            exec_llm = resolve_execution_llm(azure_ctx, state)
+            tools = azure_ctx.tools if exec_llm is azure_ctx.mini_llm else rebind_tools(azure_ctx.tools, exec_llm)
             response = execute_tool_calls(
                 messages,
-                azure_ctx.tools.llm_with_all_tools,
-                {"web_search": azure_ctx.tools.web_search, "RAG_search": azure_ctx.tools.rag_search},
+                tools.llm_with_all_tools,
+                {"web_search": tools.web_search, "RAG_search": tools.rag_search},
                 max_iterations=azure_ctx.settings.tool_max_iterations,
                 timeout=azure_ctx.settings.tool_timeout_seconds,
                 retry_attempts=azure_ctx.settings.llm_retry_attempts,
@@ -387,7 +393,7 @@ Produce a comprehensive, balanced verdict:
 
 Be rigorous, evidence-based, and fair. Cite specific arguments from the debate transcript."""
 
-        verdict = _invoke_with_retries(ctx.reasoning_llm, prompt, "debate_judge")
+        verdict = _invoke_with_retries(resolve_reasoning_llm(ctx, state), prompt, "debate_judge")
 
         return cast(
             State,

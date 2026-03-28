@@ -17,7 +17,13 @@ from cloudy_intell.schemas.models import State
 __all__ = ["create_initial_state", "create_debate_initial_state"]
 
 
-def create_initial_state(user_problem: str, min_iterations: int = 1, max_iterations: int = 3) -> State:
+def create_initial_state(
+    user_problem: str,
+    min_iterations: int = 1,
+    max_iterations: int = 3,
+    reasoning_model: str | None = None,
+    execution_model: str | None = None,
+) -> State:
     """Create graph state with explicit defaults for every tracked field.
 
     Keeping full defaults in one place avoids subtle state key omissions when
@@ -58,6 +64,9 @@ def create_initial_state(user_problem: str, min_iterations: int = 1, max_iterati
         "current_debate_round": 0,
         "max_debate_rounds": 2,
         "debate_summary": None,
+        # Model selection — per-run overrides (None = use defaults).
+        "reasoning_model": reasoning_model,
+        "execution_model": execution_model,
     }
 
 
@@ -106,4 +115,7 @@ def create_debate_initial_state(
         "current_debate_round": 0,
         "max_debate_rounds": max_debate_rounds,
         "debate_summary": None,
+        # Model selection — per-run overrides (None = use defaults).
+        "reasoning_model": None,
+        "execution_model": None,
     }

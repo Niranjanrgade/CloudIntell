@@ -13,5 +13,7 @@
   "factual_errors_exist": false,
   "design_flaws_exist": false,
   "final_architecture": null,
-  "architecture_summary": null
+  "architecture_summary": null,
+  "reasoning_model": null,
+  "execution_model": null
 }

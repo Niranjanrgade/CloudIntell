@@ -46,8 +46,8 @@ class AppSettings(BaseSettings):
     # Split by role so supervisor (reasoning) and execution (domain agent)
     # paths can evolve independently.  Reasoning model handles complex
     # decomposition and synthesis; execution model handles tool-calling loops.
-    llm_reasoning_model: str = "gpt-5"
-    llm_execution_model: str = "gpt-4o-mini"
+    llm_reasoning_model: str = "gpt-5.4"
+    llm_execution_model: str = "gpt-5.4-mini"
 
     # ── Tool and retry behavior ─────────────────────────────────────────
     tool_timeout_seconds: float = 120.0     # Max wall-clock time for a single tool-calling loop.

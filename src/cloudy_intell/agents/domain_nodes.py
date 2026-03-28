@@ -27,7 +27,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from cloudy_intell.agents.context import RuntimeContext
 from cloudy_intell.agents.tool_execution import detect_errors_llm, execute_tool_calls, format_component_recommendations
+from cloudy_intell.infrastructure.llm_factory import resolve_execution_llm
 from cloudy_intell.infrastructure.logging_utils import get_logger
+from cloudy_intell.infrastructure.tools import rebind_tools
 from cloudy_intell.schemas.models import State
 
 logger = get_logger(__name__)
@@ -119,10 +121,12 @@ def _domain_architect(ctx: RuntimeContext, domain: str):
         messages = [SystemMessage(content=system_prompt), HumanMessage(content=state["user_problem"])]
 
         try:
+            exec_llm = resolve_execution_llm(ctx, state)
+            tools = ctx.tools if exec_llm is ctx.mini_llm else rebind_tools(ctx.tools, exec_llm)
             response = execute_tool_calls(
                 messages,
-                ctx.tools.llm_with_all_tools,
-                {"web_search": ctx.tools.web_search, "RAG_search": ctx.tools.rag_search},
+                tools.llm_with_all_tools,
+                {"web_search": tools.web_search, "RAG_search": tools.rag_search},
                 max_iterations=ctx.settings.tool_max_iterations,
                 timeout=ctx.settings.tool_timeout_seconds,
                 retry_attempts=ctx.settings.llm_retry_attempts,
@@ -239,10 +243,12 @@ def _domain_validator(ctx: RuntimeContext, domain: str):
         ]
 
         try:
+            exec_llm = resolve_execution_llm(ctx, state)
+            tools = ctx.tools if exec_llm is ctx.mini_llm else rebind_tools(ctx.tools, exec_llm)
             response = execute_tool_calls(
                 messages,
-                ctx.tools.llm_with_rag_tools,
-                {"RAG_search": ctx.tools.rag_search},
+                tools.llm_with_rag_tools,
+                {"RAG_search": tools.rag_search},
                 max_iterations=ctx.settings.tool_max_iterations,
                 timeout=ctx.settings.tool_timeout_seconds,
                 retry_attempts=ctx.settings.llm_retry_attempts,
@@ -254,7 +260,7 @@ def _domain_validator(ctx: RuntimeContext, domain: str):
             validation_result = f"[{domain}_validator] Error during validation: {exc}"
             logger.error(validation_result, exc_info=True)
 
-        has_errors = detect_errors_llm(validation_result, ctx.mini_llm)
+        has_errors = detect_errors_llm(validation_result, resolve_execution_llm(ctx, state))
         feedback: Dict[str, Any] = {
             "domain": domain,
             "validation_result": validation_result,

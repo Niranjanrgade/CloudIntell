@@ -33,7 +33,7 @@ interface CopilotSidebarProps {
    *  horizontal bar (short) — used in Compare and Debate modes. */
   variant?: 'sidebar' | 'bottom';
   /** Callback invoked when the user submits a problem — triggers the run orchestration. */
-  onRunStart: (problem: string, provider: string) => Promise<void>;
+  onRunStart: (problem: string, provider: string, modelOverrides?: { reasoning_model?: string; execution_model?: string }) => Promise<void>;
   /** Current run lifecycle status — disables input while 'running'. */
   runStatus: RunStatus;
   /** The array of chat messages to display (user, assistant, and status messages). */
@@ -45,6 +45,8 @@ interface CopilotSidebarProps {
   architectureResult?: ArchitectureState | null;
   /** Callback to switch the parent's view to the full architecture report overlay. */
   onViewFullReport?: () => void;
+  /** Currently selected model overrides from sidebar. */
+  modelOverrides?: { reasoning_model?: string; execution_model?: string };
 }
 
 export function CopilotSidebar({
@@ -56,6 +58,7 @@ export function CopilotSidebar({
   setMessages,
   architectureResult,
   onViewFullReport,
+  modelOverrides,
 }: CopilotSidebarProps) {
   // Whether the sidebar is open or minimized to a floating button
   const [isOpen, setIsOpen] = useState(true);
@@ -151,7 +154,7 @@ export function CopilotSidebar({
     if (!input.trim() || runStatus === 'running') return;
     const problem = input.trim();
     setInput('');
-    onRunStart(problem, provider);
+    onRunStart(problem, provider, modelOverrides);
   };
 
   // ── Collapsed state ───────────────────────────────────────────────────

@@ -33,6 +33,8 @@ export async function POST(req: NextRequest) {
       aws_architecture_summary,
       azure_architecture_summary,
       max_debate_rounds = 2,
+      reasoning_model,
+      execution_model,
     } = body as {
       thread_id: string;
       user_problem: string;
@@ -42,6 +44,8 @@ export async function POST(req: NextRequest) {
       aws_architecture_summary?: string;
       azure_architecture_summary?: string;
       max_debate_rounds?: number;
+      reasoning_model?: string;
+      execution_model?: string;
     };
 
     // --- 2. Input validation ---
@@ -88,6 +92,8 @@ export async function POST(req: NextRequest) {
           current_debate_round: 0,
           max_debate_rounds,
           debate_summary: null,
+          reasoning_model: reasoning_model || null,
+          execution_model: execution_model || null,
         }
       : {
           messages: [{ role: 'human', content: user_problem }],
@@ -112,6 +118,9 @@ export async function POST(req: NextRequest) {
           current_debate_round: 0,
           max_debate_rounds: 2,
           debate_summary: null,
+          // Model selection — per-run overrides
+          reasoning_model: reasoning_model || null,
+          execution_model: execution_model || null,
         };
 
     // --- 6. Select the correct graph name ---

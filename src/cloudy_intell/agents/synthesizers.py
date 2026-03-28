@@ -23,6 +23,7 @@ from typing import Any, Dict, cast
 from langchain_core.messages import SystemMessage
 
 from cloudy_intell.agents.context import RuntimeContext
+from cloudy_intell.infrastructure.llm_factory import resolve_reasoning_llm
 from cloudy_intell.infrastructure.logging_utils import get_logger
 from cloudy_intell.schemas.models import State
 
@@ -119,7 +120,7 @@ def architect_synthesizer(ctx: RuntimeContext):
         3. Key design decisions and tradeoffs
         """
 
-        architecture_summary = _invoke_with_retries(ctx.reasoning_llm, prompt, "architect_synthesizer")
+        architecture_summary = _invoke_with_retries(resolve_reasoning_llm(ctx, state), prompt, "architect_synthesizer")
         return cast(
             State,
             {
@@ -179,7 +180,7 @@ def validation_synthesizer(ctx: RuntimeContext):
         4. Recommendation: iterate or finalize
         """
 
-        validation_summary = _invoke_with_retries(ctx.reasoning_llm, prompt, "validation_synthesizer")
+        validation_summary = _invoke_with_retries(resolve_reasoning_llm(ctx, state), prompt, "validation_synthesizer")
         return cast(State, {"validation_summary": validation_summary})
 
     return _node
@@ -234,7 +235,7 @@ def final_architecture_generator(ctx: RuntimeContext):
         5. Deployment guidance
         """
 
-        final_doc = _invoke_with_retries(ctx.reasoning_llm, prompt, "final_architecture_generator")
+        final_doc = _invoke_with_retries(resolve_reasoning_llm(ctx, state), prompt, "final_architecture_generator")
         final_state: Dict[str, Any] = {
             "document": final_doc,
             "components": architecture_components,

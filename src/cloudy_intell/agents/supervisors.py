@@ -25,6 +25,7 @@ from typing import cast
 from langchain_core.messages import SystemMessage
 
 from cloudy_intell.agents.context import RuntimeContext
+from cloudy_intell.infrastructure.llm_factory import resolve_reasoning_llm
 from cloudy_intell.infrastructure.logging_utils import get_logger
 from cloudy_intell.schemas.models import State, TaskDecomposition, ValidationDecomposition
 
@@ -95,7 +96,7 @@ def architect_supervisor(ctx: RuntimeContext):
         """
 
         try:
-            structured_llm = ctx.reasoning_llm.with_structured_output(TaskDecomposition)
+            structured_llm = resolve_reasoning_llm(ctx, state).with_structured_output(TaskDecomposition)
             messages = [SystemMessage(content=system_prompt)]
 
             task_decomposition = None
@@ -221,7 +222,7 @@ def validator_supervisor(ctx: RuntimeContext):
         """
 
         try:
-            structured_llm = ctx.reasoning_llm.with_structured_output(ValidationDecomposition)
+            structured_llm = resolve_reasoning_llm(ctx, state).with_structured_output(ValidationDecomposition)
             messages = [SystemMessage(content=system_prompt)]
 
             validation_decomposition = None
