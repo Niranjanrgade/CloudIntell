@@ -20,11 +20,19 @@ export function FarRightEdge({
   markerEnd,
   label,
 }: EdgeProps) {
-  // Route it to the far right, past the other nodes
+  // The X-coordinate where the edge routes along the far right of the graph.
+  // Set to 950px which is to the right of all node positions (max node x is ~700).
   const farRightX = 950;
+  // Radius for the quadratic Bézier curves at each corner of the path.
   const radius = 16;
   
-  // Path with rounded corners
+  // Build an SVG path that:
+  // 1. Starts at the source (decision node's right handle)
+  // 2. Goes horizontally right to (farRightX - radius)
+  // 3. Curves 90° to go upward using a quadratic Bézier (Q command)
+  // 4. Goes vertically up to (targetY + radius)
+  // 5. Curves 90° to go horizontally left toward the target
+  // 6. Goes horizontally left to the target (architect supervisor's right handle)
   const path = `
     M ${sourceX} ${sourceY} 
     L ${farRightX - radius} ${sourceY} 
@@ -36,7 +44,11 @@ export function FarRightEdge({
 
   return (
     <>
+      {/* Render the SVG path using React Flow's BaseEdge which handles
+          stroke styling and the arrowhead marker at the end. */}
       <BaseEdge path={path} markerEnd={markerEnd} style={style} />
+      {/* "No" label — positioned near the source handle (slightly right and above)
+          to clearly indicate this is the validation-failure iteration path. */}
       {label && (
         <text
           x={sourceX + 20}

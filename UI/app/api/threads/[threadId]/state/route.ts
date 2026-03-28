@@ -19,11 +19,19 @@ export async function GET(
   { params }: { params: Promise<{ threadId: string }> },
 ) {
   try {
+    // Extract the dynamic route segment — `threadId` is resolved from the URL
+    // e.g. /api/threads/abc-123/state → threadId = 'abc-123'.
+    // Next.js 15 wraps dynamic params in a Promise.
     const { threadId } = await params;
+
+    // Fetch the complete graph state from the LangGraph backend.
+    // This includes all accumulated fields (architecture_components,
+    // final_architecture, validation_summary, etc.).
     const client = getLanggraphClient();
     const state = await client.threads.getState(threadId);
     return NextResponse.json(state);
   } catch (error: unknown) {
+    // 502 indicates the LangGraph backend could not be reached.
     const message = error instanceof Error ? error.message : 'Failed to fetch state';
     return NextResponse.json({ error: message }, { status: 502 });
   }

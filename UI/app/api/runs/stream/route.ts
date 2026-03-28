@@ -20,6 +20,9 @@ import { getLanggraphClient } from '@/lib/langgraph-client';
 
 export async function POST(req: NextRequest) {
   try {
+    // --- 1. Parse & destructure request body ---
+    // Extract run configuration from the client.  Defaults match the Python
+    // backend's `create_initial_state()` for non-debate runs.
     const body = await req.json();
     const {
       thread_id,
@@ -41,6 +44,8 @@ export async function POST(req: NextRequest) {
       max_debate_rounds?: number;
     };
 
+    // --- 2. Input validation ---
+    // Both fields are mandatory; without them the backend graph can't start.
     if (!thread_id || !user_problem) {
       return new Response(
         JSON.stringify({ error: 'thread_id and user_problem are required' }),
@@ -48,11 +53,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // --- 3. Instantiate the server-side LangGraph SDK client ---
     const client = getLanggraphClient();
 
-    // Build initial input depending on graph type
+    // --- 4. Determine graph variant ---
+    // 'debate' mode triggers the debate graph; otherwise use the provider graph.
     const isDebate = cloud_provider === 'debate';
 
+    // --- 5. Construct initial graph state ---
+    // This object must include every field from the Python State TypedDict
+    // (src/cloudy_intell/schemas/models.py) with appropriate defaults.
+    // The debate graph sets iteration fields to 0 (not applicable) and
+    // populates the architecture summaries from prior runs.
     const input = isDebate
       ? {
           messages: [{ role: 'human', content: user_problem }],
@@ -102,7 +114,11 @@ export async function POST(req: NextRequest) {
           debate_summary: null,
         };
 
-    // Select the correct graph based on cloud provider
+    // --- 6. Select the correct graph name ---
+    // Graph names must match the `graphs` keys in langgraph.json.
+    //   - 'cloudy-intell'        → AWS architecture generation
+    //   - 'cloudy-intell-azure'  → Azure architecture generation
+    //   - 'cloudy-intell-debate' → Head-to-head AWS vs Azure debate
     let graphName: string;
     if (isDebate) {
       graphName = 'cloudy-intell-debate';
@@ -112,25 +128,33 @@ export async function POST(req: NextRequest) {
       graphName = 'cloudy-intell';
     }
 
-    // Stream the run with "updates" mode so we see per-node state deltas
+    // --- 7. Start the streaming run ---
+    // `streamMode: ['updates']` makes the SDK emit per-node state deltas
+    // instead of the full accumulated state, which keeps payloads small.
     const streamResponse = client.runs.stream(thread_id, graphName, {
       input,
       streamMode: ['updates'],
     });
 
-    // Build a ReadableStream that forwards SSE events to the browser
+    // --- 8. Convert async iterator → SSE ReadableStream ---
+    // The Web Streams API ReadableStream sends SSE-formatted chunks to the
+    // browser.  Each chunk is prefixed with "data: " and terminated with a
+    // double newline, conforming to the Server-Sent Events spec.
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
         try {
+          // Forward each LangGraph SDK event as a JSON SSE message.
           for await (const event of streamResponse) {
             const ssePayload = `data: ${JSON.stringify({ event: event.event, data: event.data })}\n\n`;
             controller.enqueue(encoder.encode(ssePayload));
           }
-          // Signal stream end
+          // Signal the end of the stream to the client.
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
         } catch (err) {
+          // On stream error, send an error event so the client can surface
+          // the failure message instead of hanging indefinitely.
           const msg = err instanceof Error ? err.message : 'Stream error';
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ event: 'error', data: { message: msg } })}\n\n`),
@@ -140,14 +164,17 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Return SSE response with appropriate headers to disable buffering/caching.
     return new Response(readable, {
       headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
+        'Content-Type': 'text/event-stream',  // SSE MIME type
+        'Cache-Control': 'no-cache',           // Prevent CDN / browser caching
+        Connection: 'keep-alive',              // Keep TCP connection open for streaming
       },
     });
   } catch (error: unknown) {
+    // Catch-all: if anything fails before the stream starts, return a 502
+    // to indicate the LangGraph backend is unreachable or misconfigured.
     const message = error instanceof Error ? error.message : 'Failed to start run';
     return new Response(JSON.stringify({ error: message }), {
       status: 502,

@@ -27,8 +27,26 @@ import { ArchitectureFullView } from '@/components/ArchitectureFullView';
 import { useRunOrchestration } from '@/hooks/useRunOrchestration';
 
 export default function Home() {
+  // ── Local UI state ────────────────────────────────────────────────────────
+  // `viewMode` tracks which view the user has selected in the left sidebar:
+  // 'AWS' | 'Azure' → shows the React Flow graph, 'Compare' → side-by-side
+  // report, 'Debate' → AWS vs Azure debate view.
   const [viewMode, setViewMode] = useState<ViewMode>('AWS');
+
+  // Controls whether to show the full architecture report overlay instead of
+  // the React Flow graph (only applicable in single-provider AWS/Azure mode).
   const [showFullReport, setShowFullReport] = useState(false);
+
+  // ── Run orchestration hook ────────────────────────────────────────────────
+  // `useRunOrchestration` is the central hook that manages the entire
+  // LangGraph run lifecycle.  It returns:
+  //   - runStatus: 'idle' | 'running' | 'completed' | 'error'
+  //   - activeNodes / completedNodes: Sets<string> for graph node highlighting
+  //   - messages / setMessages: Chat message array for the CopilotSidebar
+  //   - architectureResult: Final architecture state from the backend
+  //   - awsResult / azureResult: Per-provider results for Compare view
+  //   - debateResult / debatePhase: Debate mode state
+  //   - startRun: Callback to kick off a new architecture generation run
   const {
     runStatus,
     activeNodes,
@@ -44,17 +62,28 @@ export default function Home() {
   } = useRunOrchestration();
 
   return (
+    // Root container: full-screen horizontal flex layout
     <div className="flex h-screen w-full overflow-hidden bg-slate-50">
-      {/* Left Sidebar Navigator */}
+
+      {/* ── Left Sidebar Navigator ─────────────────────────────────────────
+           Fixed-width dark sidebar with nav buttons for AWS, Azure, Compare,
+           and Debate modes.  Passes viewMode and setter to allow switching. */}
       <SidebarNavigator viewMode={viewMode} setViewMode={setViewMode} />
 
-      {/* Main Content Area */}
+      {/* ── Main Content Area ──────────────────────────────────────────────
+           Layout direction changes based on view mode:
+           - Compare / Debate → flex-col (content on top, chat on bottom)
+           - AWS / Azure → flex-row (graph on left, chat sidebar on right)  */}
       <main
         className={`flex flex-1 overflow-hidden ${viewMode === 'Compare' || viewMode === 'Debate' ? 'flex-col' : 'flex-row'}`}
       >
+        {/* ── Debate View ────────────────────────────────────────────────
+             Displays the multi-round debate between AWS and Azure advocates.
+             The CopilotSidebar is shown as a bottom bar in this mode. */}
         {viewMode === 'Debate' ? (
           <>
             <div className="flex-1 relative overflow-hidden flex flex-col">
+              {/* View header — static title and description for the Debate panel */}
               <div className="p-6 pb-0 z-10 bg-slate-50">
                 <h2 className="text-2xl font-bold text-slate-800">
                   Debate Mode
@@ -64,6 +93,9 @@ export default function Home() {
                   for your architecture problem.
                 </p>
               </div>
+              {/* DebateView renders collapsible summaries, debate round cards,
+                  and the judge's verdict.  It receives the debate results from
+                  the orchestration hook and the current phase for animations. */}
               <DebateView
                 userProblem={debateResult ? undefined : undefined}
                 awsSummary={debateResult?.awsSummary}
@@ -74,6 +106,8 @@ export default function Home() {
                 debatePhase={debatePhase}
               />
             </div>
+            {/* Bottom chat bar — allows the user to submit problems while
+                viewing debate results above */}
             <CopilotSidebar
               provider={viewMode}
               variant="bottom"
@@ -84,8 +118,12 @@ export default function Home() {
             />
           </>
         ) : viewMode === 'Compare' ? (
+          /* ── Compare View ──────────────────────────────────────────────
+               Renders AWS and Azure architecture reports side-by-side using
+               ReactMarkdown.  Also uses a bottom chat bar layout. */
           <>
             <div className="flex-1 relative overflow-hidden flex flex-col">
+              {/* View header — static title for the comparison panel */}
               <div className="p-6 pb-0 z-10 bg-slate-50">
                 <h2 className="text-2xl font-bold text-slate-800">
                   Compare Solutions
@@ -95,8 +133,11 @@ export default function Home() {
                   architectures.
                 </p>
               </div>
+              {/* CompareView reads from awsResult and azureResult to display
+                  the full markdown architecture_summary for each provider. */}
               <CompareView awsResult={awsResult} azureResult={azureResult} />
             </div>
+            {/* Bottom chat bar for Compare mode */}
             <CopilotSidebar
               provider={viewMode}
               variant="bottom"
@@ -107,16 +148,24 @@ export default function Home() {
             />
           </>
         ) : (
+          /* ── Single Provider View (AWS / Azure) ────────────────────────
+               Two-panel horizontal layout:
+               Left:  React Flow graph OR full architecture report overlay
+               Right: CopilotSidebar (chat interface) */
           <>
-            {/* Main Content Area - Graph or Full Report */}
+            {/* Conditionally show the full report overlay or the React Flow graph.
+                The report is shown when the user clicks "View Full Architecture Report"
+                in the sidebar after a run completes. */}
             {showFullReport && architectureResult ? (
+              // Full-screen architecture report rendered as styled markdown
               <ArchitectureFullView
                 result={architectureResult}
                 onBack={() => setShowFullReport(false)}
               />
             ) : (
               <div className="flex-1 h-full relative flex flex-col">
-                {/* Header Overlay */}
+                {/* Header Overlay — floats on top of the React Flow canvas.
+                    pointer-events-none ensures graph interactions pass through. */}
                 <div className="absolute top-0 left-0 right-0 p-6 z-10 pointer-events-none">
                   <h2 className="text-2xl font-bold text-slate-800">
                     {viewMode} Architecture
@@ -128,7 +177,9 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* Graph Container */}
+                {/* React Flow Graph — interactive visualization of the LangGraph
+                    agent pipeline.  Nodes light up in real time as the backend
+                    graph executes (active = pulsing purple, completed = green). */}
                 <div className="w-full h-full">
                   <WorkflowGraph
                     provider={viewMode}
@@ -140,7 +191,9 @@ export default function Home() {
               </div>
             )}
 
-            {/* Right Sidebar - Copilot */}
+            {/* Right Sidebar — CopilotSidebar in 'sidebar' variant (full height).
+                In single-provider mode, it also shows the "View Full Report" button
+                after a run completes, and passes the architectureResult for context. */}
             <CopilotSidebar
               provider={viewMode}
               variant="sidebar"

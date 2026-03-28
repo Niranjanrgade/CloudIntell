@@ -15,16 +15,29 @@ import { ChevronDown, ChevronUp, Gavel, Swords, Shield } from 'lucide-react';
 import type { DebateRound } from '@/lib/types';
 
 interface DebateViewProps {
+  /** The user's original cloud architecture problem statement. */
   userProblem?: string;
+  /** Polished markdown summary of the AWS architecture (from architecture_summary). */
   awsSummary?: string | null;
+  /** Polished markdown summary of the Azure architecture. */
   azureSummary?: string | null;
+  /** Array of debate round objects, each containing AWS and Azure arguments. */
   debateRounds?: DebateRound[];
+  /** The judge's final verdict markdown, rendered after all rounds complete. */
   debateSummary?: string | null;
+  /** Whether the debate orchestration is currently running. */
   isRunning?: boolean;
-  /** Which phase the debate is in: 'generating' | 'debating' | 'judging' | 'completed' | 'idle' */
+  /** Current phase of the debate lifecycle:
+   *  'generating' = building AWS/Azure architectures,
+   *  'debating' = advocates exchanging arguments,
+   *  'judging' = neutral judge evaluating,
+   *  'completed' = debate finished,
+   *  'idle' = no debate started. */
   debatePhase?: string;
 }
 
+// Shared Tailwind Typography (prose) classes used across all markdown-rendered
+// sections in this component.  Extracted to a constant to avoid repetition.
 const proseClasses =
   'prose prose-sm prose-slate max-w-none prose-headings:text-slate-800 prose-p:text-slate-600 prose-li:text-slate-600 prose-strong:text-slate-800 prose-code:text-indigo-600 prose-code:bg-indigo-50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-900 prose-pre:text-slate-100';
 
@@ -37,9 +50,12 @@ export function DebateView({
   isRunning = false,
   debatePhase = 'idle',
 }: DebateViewProps) {
+  // Local toggle state for expanding/collapsing the architecture summaries
   const [awsExpanded, setAwsExpanded] = useState(false);
   const [azureExpanded, setAzureExpanded] = useState(false);
 
+  // Phase label configuration — maps each debate phase to a human-readable
+  // text label and Tailwind color classes for the status badge.
   const phaseLabel: Record<string, { text: string; color: string }> = {
     idle: { text: 'Ready', color: 'bg-slate-100 text-slate-600' },
     generating: {
@@ -60,11 +76,15 @@ export function DebateView({
     },
   };
 
+  // Look up the current phase's display config, defaulting to 'idle'
   const phase = phaseLabel[debatePhase] || phaseLabel.idle;
 
   return (
     <div className="w-full h-full flex flex-col gap-5 p-6 bg-slate-50 overflow-y-auto">
-      {/* Header */}
+      {/* ── Header ──────────────────────────────────────────────────────────
+           Shows the Debate Mode title with a swords icon and the current
+           phase status badge (e.g. "Debate in Progress").  The badge pulses
+           with animate-pulse when the debate is actively running. */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-purple-100 rounded-lg">
@@ -84,10 +104,14 @@ export function DebateView({
         </span>
       </div>
 
-      {/* Collapsible Architecture Summaries */}
+      {/* ── Collapsible Architecture Summaries ───────────────────────────
+           Two side-by-side collapsible cards showing the AWS and Azure
+           architecture summaries that were generated before the debate.
+           Users can expand/collapse each to review the source material
+           the advocates are debating about. */}
       {(awsSummary || azureSummary) && (
         <div className="flex gap-4">
-          {/* AWS Summary */}
+          {/* AWS Summary — orange accent, collapsible */}
           <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <button
               onClick={() => setAwsExpanded(!awsExpanded)}
@@ -114,7 +138,7 @@ export function DebateView({
             )}
           </div>
 
-          {/* Azure Summary */}
+          {/* Azure Summary — blue accent, collapsible */}
           <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <button
               onClick={() => setAzureExpanded(!azureExpanded)}
@@ -143,7 +167,11 @@ export function DebateView({
         </div>
       )}
 
-      {/* Debate Rounds */}
+      {/* ── Debate Rounds ──────────────────────────────────────────────
+           Each round is rendered as a pair of side-by-side cards:
+           - Left card: AWS Advocate's argument (orange border)
+           - Right card: Azure Advocate's argument (blue border)
+           A centered round number badge sits above each pair. */}
       {debateRounds.length > 0 && (
         <div className="space-y-5">
           {debateRounds.map((round) => (
@@ -156,7 +184,7 @@ export function DebateView({
               </div>
 
               <div className="flex gap-4">
-                {/* AWS Advocate */}
+                {/* ── AWS Advocate argument card ── */}
                 <div className="flex-1 bg-white rounded-xl border-2 border-orange-200 shadow-sm p-5">
                   <div className="flex items-center gap-2 mb-3 pb-2 border-b border-orange-100">
                     <div className="w-2 h-2 bg-orange-500 rounded-full" />
@@ -173,7 +201,7 @@ export function DebateView({
                   </div>
                 </div>
 
-                {/* Azure Advocate */}
+                {/* ── Azure Advocate argument card ── */}
                 <div className="flex-1 bg-white rounded-xl border-2 border-blue-200 shadow-sm p-5">
                   <div className="flex items-center gap-2 mb-3 pb-2 border-b border-blue-100">
                     <div className="w-2 h-2 bg-blue-500 rounded-full" />
@@ -195,7 +223,9 @@ export function DebateView({
         </div>
       )}
 
-      {/* Placeholder while debating */}
+      {/* ── Loading placeholder ─────────────────────────────────────────
+           Shown while architectures are being generated or while waiting
+           for the debate to begin (no rounds yet, not idle, no verdict). */}
       {debateRounds.length === 0 && !debateSummary && debatePhase !== 'idle' && (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-3">
@@ -209,7 +239,10 @@ export function DebateView({
         </div>
       )}
 
-      {/* Judge's Verdict */}
+      {/* ── Judge's Verdict ─────────────────────────────────────────────
+           Full-width card with a gradient background (indigo → purple) to
+           visually distinguish the judge's evaluation from advocate arguments.
+           Only rendered after the debate_judge node completes. */}
       {debateSummary && (
         <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-200 shadow-md p-6">
           <div className="flex items-center gap-3 mb-4 pb-3 border-b border-indigo-200">
@@ -235,7 +268,9 @@ export function DebateView({
         </div>
       )}
 
-      {/* Empty state */}
+      {/* ── Empty state (idle) ─────────────────────────────────────────
+           Centered placeholder when no debate has been started yet.
+           Prompts the user to submit a problem to begin the debate. */}
       {debatePhase === 'idle' && !debateSummary && debateRounds.length === 0 && (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-3 max-w-md">
