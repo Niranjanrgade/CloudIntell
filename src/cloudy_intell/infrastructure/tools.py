@@ -23,6 +23,7 @@ from langchain_core.tools import Tool
 from langchain_openai import ChatOpenAI
 
 from cloudy_intell.config.provider_meta import ProviderMeta
+from cloudy_intell.config.settings import AppSettings
 from cloudy_intell.infrastructure.vector_store import rag_search_function
 
 
@@ -45,6 +46,7 @@ def create_tool_bundle(
     base_llm: ChatOpenAI,
     vector_store,
     provider_meta: ProviderMeta | None = None,
+    settings: AppSettings | None = None,
 ) -> ToolBundle:
     """Create all tools and pre-bound LLM variants.
 
@@ -56,6 +58,8 @@ def create_tool_bundle(
         vector_store: ChromaDB vector store instance for RAG search.
         provider_meta: Optional provider metadata; when provided, the RAG
                        tool description is customized for that provider.
+        settings: Optional app settings; when provided, re-ranking
+                  configuration is forwarded to the RAG search function.
 
     Returns:
         An immutable ``ToolBundle`` with tools and pre-bound LLM instances.
@@ -77,9 +81,19 @@ def create_tool_bundle(
         )
     )
 
+    # Wire re-ranking parameters when settings are available and enabled.
+    rag_kwargs: dict = {"vector_store": vector_store}
+    if settings and settings.rerank_enabled:
+        rag_kwargs.update(
+            rerank=True,
+            rerank_model=settings.rerank_model,
+            k=settings.rerank_top_k,
+            candidate_multiplier=settings.rerank_candidate_multiplier,
+        )
+
     tool_rag_search = Tool(
         name="RAG_search",
-        func=partial(rag_search_function, vector_store=vector_store),
+        func=partial(rag_search_function, **rag_kwargs),
         description=rag_description,
     )
 

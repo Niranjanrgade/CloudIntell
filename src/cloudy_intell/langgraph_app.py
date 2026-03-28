@@ -46,7 +46,7 @@ def _build_provider_graph(settings, mini_llm, reasoning_llm, provider_name):
     """
     meta = get_provider_meta(provider_name)
     vector_store = create_vector_store(settings, provider=provider_name)
-    tools = create_tool_bundle(mini_llm, vector_store, provider_meta=meta)
+    tools = create_tool_bundle(mini_llm, vector_store, provider_meta=meta, settings=settings)
 
     ctx = RuntimeContext(
         settings=settings,

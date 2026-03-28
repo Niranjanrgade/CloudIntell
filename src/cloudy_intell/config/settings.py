@@ -79,6 +79,15 @@ class AppSettings(BaseSettings):
     # for similarity search against the provider documentation vector stores.
     embedding_model: str = "nomic-embed-text"
 
+    # ── Re-ranking (RAG quality) ────────────────────────────────────────
+    # A cross-encoder re-ranker rescores initial retrieval candidates for
+    # higher relevance accuracy.  Enabled by default using FlashRank which
+    # runs locally with no API key required.
+    rerank_enabled: bool = True
+    rerank_model: str = "ms-marco-MiniLM-L-12-v2"  # FlashRank model name.
+    rerank_top_k: int = 5                           # Final documents returned after re-ranking.
+    rerank_candidate_multiplier: int = 4            # Fetch top_k * multiplier candidates before re-ranking.
+
     # ── Provider mode ───────────────────────────────────────────────────
     # Controls which cloud provider pipeline(s) to execute:
     #   "aws"   — Run only the AWS architecture pipeline (default).

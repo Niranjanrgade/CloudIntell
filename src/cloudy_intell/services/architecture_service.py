@@ -68,7 +68,7 @@ def _build_provider_runtime(
     """
 
     vector_store = create_vector_store(settings, provider=provider_meta.name)
-    tools = create_tool_bundle(mini_llm, vector_store, provider_meta=provider_meta)
+    tools = create_tool_bundle(mini_llm, vector_store, provider_meta=provider_meta, settings=settings)
     ctx = RuntimeContext(
         settings=settings,
         mini_llm=mini_llm,
