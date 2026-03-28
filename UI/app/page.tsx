@@ -21,6 +21,7 @@ import { useState, useEffect } from 'react';
 import { CopilotSidebar, ViewMode } from '@/components/CopilotSidebar';
 import { CompareView } from '@/components/CompareView';
 import { DebateView } from '@/components/DebateView';
+import { DebateWorkflowGraph } from '@/components/DebateWorkflowGraph';
 import { SidebarNavigator } from '@/components/SidebarNavigator';
 import { WorkflowGraph } from '@/components/WorkflowGraph';
 import { ArchitectureFullView } from '@/components/ArchitectureFullView';
@@ -37,6 +38,9 @@ export default function Home() {
   // Controls whether to show the full architecture report overlay instead of
   // the React Flow graph (only applicable in single-provider AWS/Azure mode).
   const [showFullReport, setShowFullReport] = useState(false);
+
+  // Controls whether the Debate view shows the workflow graph or the results.
+  const [debateTab, setDebateTab] = useState<'graph' | 'results'>('graph');
 
   // ── Model selection state ──────────────────────────────────────────────
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -106,28 +110,53 @@ export default function Home() {
         {viewMode === 'Debate' ? (
           <>
             <div className="flex-1 relative overflow-hidden flex flex-col">
-              {/* View header — static title and description for the Debate panel */}
-              <div className="p-6 pb-0 z-10 bg-slate-50">
-                <h2 className="text-2xl font-bold text-slate-800">
-                  Debate Mode
-                </h2>
-                <p className="text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
-                  AWS and Azure advocates debate the merits of their platform
-                  for your architecture problem.
-                </p>
+              {/* View header with tab toggle */}
+              <div className="p-6 pb-3 z-10 bg-slate-50 flex items-end justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800">
+                    Debate Mode
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                    AWS and Azure advocates debate the merits of their platform
+                    for your architecture problem.
+                  </p>
+                </div>
+                {/* Graph / Results tab toggle */}
+                <div className="flex bg-slate-200 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setDebateTab('graph')}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${debateTab === 'graph' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Graph
+                  </button>
+                  <button
+                    onClick={() => setDebateTab('results')}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${debateTab === 'results' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Results
+                  </button>
+                </div>
               </div>
-              {/* DebateView renders collapsible summaries, debate round cards,
-                  and the judge's verdict.  It receives the debate results from
-                  the orchestration hook and the current phase for animations. */}
-              <DebateView
-                userProblem={debateResult ? undefined : undefined}
-                awsSummary={debateResult?.awsSummary}
-                azureSummary={debateResult?.azureSummary}
-                debateRounds={debateResult?.rounds}
-                debateSummary={debateResult?.summary}
-                isRunning={runStatus === 'running'}
-                debatePhase={debatePhase}
-              />
+
+              {debateTab === 'graph' ? (
+                <div className="flex-1 w-full">
+                  <DebateWorkflowGraph
+                    activeNodes={activeNodes}
+                    completedNodes={completedNodes}
+                    runStatus={runStatus}
+                  />
+                </div>
+              ) : (
+                <DebateView
+                  userProblem={debateResult ? undefined : undefined}
+                  awsSummary={debateResult?.awsSummary}
+                  azureSummary={debateResult?.azureSummary}
+                  debateRounds={debateResult?.rounds}
+                  debateSummary={debateResult?.summary}
+                  isRunning={runStatus === 'running'}
+                  debatePhase={debatePhase}
+                />
+              )}
             </div>
             {/* Bottom chat bar — allows the user to submit problems while
                 viewing debate results above */}

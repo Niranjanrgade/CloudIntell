@@ -21,8 +21,9 @@ export function FarRightEdge({
   label,
 }: EdgeProps) {
   // The X-coordinate where the edge routes along the far right of the graph.
-  // Set to 950px which is to the right of all node positions (max node x is ~700).
-  const farRightX = 950;
+  // Uses a dynamic offset from the rightmost handle to work across different
+  // graph sizes (main workflow and debate graph).
+  const farRightX = Math.max(sourceX, targetX) + 200;
   // Radius for the quadratic Bézier curves at each corner of the path.
   const radius = 16;
   
@@ -53,7 +54,7 @@ export function FarRightEdge({
         <text
           x={sourceX + 20}
           y={sourceY - 10}
-          fill="#ef4444"
+          fill={(style as React.CSSProperties)?.stroke?.toString() || '#ef4444'}
           fontSize={12}
           fontWeight="bold"
         >
