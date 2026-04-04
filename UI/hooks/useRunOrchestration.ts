@@ -536,13 +536,16 @@ export function useRunOrchestration() {
         if (cloudProvider === 'aws') setAwsResult(result);
         else if (cloudProvider === 'azure') setAzureResult(result);
 
-        // Show the architecture summary in the chat, or a generic completion message
-        const summary =
-          result?.architecture_summary ||
-          'Architecture generation completed. Switch to the Compare view to see the results.';
+        // Show a brief completion message in the chat
         setMessages((prev) => [
           ...prev,
-          { id: Date.now(), role: 'assistant', content: summary },
+          {
+            id: Date.now(),
+            role: 'assistant',
+            content: result?.architecture_summary
+              ? 'Architecture generation completed. Opening the full report now.'
+              : 'Architecture generation completed, but no summary was produced. Please try again.',
+          },
         ]);
         setRunStatus('completed');
       }

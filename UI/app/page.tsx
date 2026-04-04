@@ -93,6 +93,21 @@ export default function Home() {
     startRun,
   } = useRunOrchestration();
 
+  // Auto-show the full architecture report when a single-provider run completes
+  useEffect(() => {
+    if (
+      runStatus === 'completed' &&
+      architectureResult?.architecture_summary &&
+      (viewMode === 'AWS' || viewMode === 'Azure')
+    ) {
+      setShowFullReport(true);
+    }
+    // Reset report view when a new run starts
+    if (runStatus === 'running') {
+      setShowFullReport(false);
+    }
+  }, [runStatus, architectureResult, viewMode]);
+
   const modelOverrides = { reasoning_model: reasoningModel, execution_model: executionModel };
 
   return (
