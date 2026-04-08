@@ -1,0 +1,9 @@
+# Evaluation framework dependencies
+# Install with: pip install -r evaluation/requirements-eval.txt
+
+bert-score>=0.3.13
+nltk>=3.9
+pandas>=2.2
+tabulate>=0.9
+matplotlib>=3.9
+seaborn>=0.13

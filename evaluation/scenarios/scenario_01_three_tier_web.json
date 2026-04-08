@@ -1,0 +1,31 @@
+{
+  "id": "three_tier_web",
+  "name": "Three-Tier Web Application",
+  "description": "Design a secure, scalable three-tier web application with auto-scaling, CDN, and managed database on AWS.",
+  "user_problem": "Design a secure, scalable three-tier web application on AWS with the following requirements: (1) A presentation tier with CDN and static asset hosting, (2) An application tier with auto-scaling behind a load balancer, (3) A data tier with a managed relational database with read replicas, (4) Proper network isolation using VPCs, subnets, and security groups, (5) Encryption at rest and in transit, (6) Monitoring and logging for all tiers.",
+  "reference_architecture": {
+    "full_text": "REPLACE THIS with the official AWS reference architecture text from the AWS Well-Architected Framework or AWS Solutions Library. The reference should describe a three-tier web application architecture including: CloudFront CDN for content delivery with S3 for static assets, Application Load Balancer distributing traffic to EC2 instances in an Auto Scaling Group across multiple Availability Zones, Amazon RDS with Multi-AZ deployment and read replicas for the database tier, VPC with public and private subnets, NAT Gateway for outbound internet access from private subnets, Security groups and NACLs for network isolation, AWS Certificate Manager for TLS/SSL, CloudWatch for monitoring and CloudTrail for audit logging, and AWS KMS for encryption key management.",
+    "services_expected": [
+      "CloudFront",
+      "S3",
+      "ALB",
+      "EC2",
+      "Auto Scaling",
+      "RDS",
+      "VPC",
+      "NAT Gateway",
+      "Security Groups",
+      "CloudWatch",
+      "CloudTrail",
+      "KMS",
+      "Certificate Manager"
+    ],
+    "domains_covered": [
+      "compute",
+      "network",
+      "storage",
+      "database"
+    ]
+  },
+  "source": "Replace with official AWS documentation URL (e.g., https://docs.aws.amazon.com/whitepapers/latest/web-application-hosting-best-practices/web-application-hosting-best-practices.html)"
+}
