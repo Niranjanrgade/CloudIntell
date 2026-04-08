@@ -20,7 +20,7 @@ graph run config construction, and comparison summary generation.
 
 from __future__ import annotations
 
-import asyncio
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 import os
 from typing import Any
