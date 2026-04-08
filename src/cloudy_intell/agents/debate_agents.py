@@ -21,13 +21,12 @@ the outer function captures a ``RuntimeContext``, and the inner ``_node``
 function matches the LangGraph signature ``(State) -> State``.
 """
 
-import time
 from typing import Any, Dict, cast
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from cloudy_intell.agents.context import RuntimeContext
-from cloudy_intell.agents.tool_execution import execute_tool_calls
+from cloudy_intell.agents.tool_execution import execute_tool_calls, invoke_with_retries
 from cloudy_intell.infrastructure.llm_factory import resolve_execution_llm, resolve_reasoning_llm
 from cloudy_intell.infrastructure.logging_utils import get_logger
 from cloudy_intell.infrastructure.tools import rebind_tools
@@ -37,30 +36,6 @@ logger = get_logger(__name__)
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
-
-def _invoke_with_retries(llm, prompt: str, node_name: str, retries: int = 3) -> str:
-    """Invoke an LLM with bounded retries (mirrors synthesizers._invoke_with_retries)."""
-    last_error: Exception | None = None
-    for attempt in range(retries):
-        try:
-            response = llm.invoke([SystemMessage(content=prompt)])
-            content = getattr(response, "content", "")
-            if not isinstance(content, str) or not content.strip():
-                raise ValueError(f"[{node_name}] Empty response from LLM")
-            return content
-        except Exception as exc:  # noqa: BLE001
-            last_error = exc
-            if attempt < retries - 1:
-                wait_time = 2 ** attempt
-                logger.warning(
-                    "%s LLM call failed (attempt %s/%s), retrying in %ss: %s",
-                    node_name, attempt + 1, retries, wait_time, exc,
-                )
-                time.sleep(wait_time)
-            else:
-                logger.error("%s failed after retries: %s", node_name, exc, exc_info=True)
-    return f"[{node_name}] Error: {last_error}"
-
 
 def _format_previous_rounds(debate_rounds: list[Dict[str, Any]]) -> str:
     """Format prior debate rounds into readable context for advocates."""
@@ -393,7 +368,7 @@ Produce a comprehensive, balanced verdict:
 
 Be rigorous, evidence-based, and fair. Cite specific arguments from the debate transcript."""
 
-        verdict = _invoke_with_retries(resolve_reasoning_llm(ctx, state), prompt, "debate_judge")
+        verdict = invoke_with_retries(resolve_reasoning_llm(ctx, state), prompt, "debate_judge")
 
         return cast(
             State,

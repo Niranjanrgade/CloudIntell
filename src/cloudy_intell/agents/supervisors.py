@@ -101,7 +101,8 @@ def architect_supervisor(ctx: RuntimeContext):
 
             task_decomposition = None
             last_error = None
-            for attempt in range(3):
+            max_retries = ctx.settings.llm_retry_attempts
+            for attempt in range(max_retries + 1):
                 try:
                     response = structured_llm.invoke(messages)
                     task_decomposition = cast(TaskDecomposition, response)
@@ -110,7 +111,7 @@ def architect_supervisor(ctx: RuntimeContext):
                     break
                 except Exception as exc:  # noqa: BLE001
                     last_error = exc
-                    if attempt < 2:
+                    if attempt < max_retries:
                         time.sleep(2**attempt)
                     else:
                         raise
@@ -227,7 +228,8 @@ def validator_supervisor(ctx: RuntimeContext):
 
             validation_decomposition = None
             last_error = None
-            for attempt in range(3):
+            max_retries = ctx.settings.llm_retry_attempts
+            for attempt in range(max_retries + 1):
                 try:
                     response = structured_llm.invoke(messages)
                     validation_decomposition = cast(ValidationDecomposition, response)
@@ -236,7 +238,7 @@ def validator_supervisor(ctx: RuntimeContext):
                     break
                 except Exception as exc:  # noqa: BLE001
                     last_error = exc
-                    if attempt < 2:
+                    if attempt < max_retries:
                         time.sleep(2**attempt)
                     else:
                         raise

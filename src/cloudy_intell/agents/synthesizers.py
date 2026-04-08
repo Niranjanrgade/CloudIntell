@@ -17,53 +17,17 @@ All synthesizers use the reasoning LLM (higher capability) because they need
 to understand and integrate content across multiple domains coherently.
 """
 
-import time
 from typing import Any, Dict, cast
 
 from langchain_core.messages import SystemMessage
 
 from cloudy_intell.agents.context import RuntimeContext
+from cloudy_intell.agents.tool_execution import invoke_with_retries
 from cloudy_intell.infrastructure.llm_factory import resolve_reasoning_llm
 from cloudy_intell.infrastructure.logging_utils import get_logger
 from cloudy_intell.schemas.models import State
 
 logger = get_logger(__name__)
-
-
-def _invoke_with_retries(llm, prompt: str, node_name: str, retries: int = 3) -> str:
-    """Invoke an LLM prompt with bounded retries and validated text output.
-
-    Uses exponential backoff (1s, 2s, 4s) between retries.  Returns the LLM
-    response content as a string, or a formatted error message if all retries
-    fail.  This helper is used by all synthesizer nodes to standardize retry
-    behavior and ensure synthesizers never crash the graph on transient failures.
-    """
-
-    last_error: Exception | None = None
-    for attempt in range(retries):
-        try:
-            response = llm.invoke([SystemMessage(content=prompt)])
-            content = getattr(response, "content", "")
-            if not isinstance(content, str) or not content.strip():
-                raise ValueError(f"[{node_name}] Empty response from LLM")
-            return content
-        except Exception as exc:  # noqa: BLE001
-            last_error = exc
-            if attempt < retries - 1:
-                wait_time = 2**attempt
-                logger.warning(
-                    "%s LLM call failed (attempt %s/%s), retrying in %ss: %s",
-                    node_name,
-                    attempt + 1,
-                    retries,
-                    wait_time,
-                    exc,
-                )
-                time.sleep(wait_time)
-            else:
-                logger.error("%s failed after retries: %s", node_name, exc, exc_info=True)
-
-    return f"[{node_name}] Error: {last_error}"
 
 
 def architect_synthesizer(ctx: RuntimeContext):
@@ -120,7 +84,7 @@ def architect_synthesizer(ctx: RuntimeContext):
         3. Key design decisions and tradeoffs
         """
 
-        architecture_summary = _invoke_with_retries(resolve_reasoning_llm(ctx, state), prompt, "architect_synthesizer")
+        architecture_summary = invoke_with_retries(resolve_reasoning_llm(ctx, state), prompt, "architect_synthesizer")
         return cast(
             State,
             {
@@ -180,7 +144,7 @@ def validation_synthesizer(ctx: RuntimeContext):
         4. Recommendation: iterate or finalize
         """
 
-        validation_summary = _invoke_with_retries(resolve_reasoning_llm(ctx, state), prompt, "validation_synthesizer")
+        validation_summary = invoke_with_retries(resolve_reasoning_llm(ctx, state), prompt, "validation_synthesizer")
         return cast(State, {"validation_summary": validation_summary})
 
     return _node
@@ -235,7 +199,7 @@ def final_architecture_generator(ctx: RuntimeContext):
         5. Deployment guidance
         """
 
-        final_doc = _invoke_with_retries(resolve_reasoning_llm(ctx, state), prompt, "final_architecture_generator")
+        final_doc = invoke_with_retries(resolve_reasoning_llm(ctx, state), prompt, "final_architecture_generator")
         final_state: Dict[str, Any] = {
             "document": final_doc,
             "components": architecture_components,

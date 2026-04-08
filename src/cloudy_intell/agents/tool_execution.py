@@ -32,6 +32,41 @@ from cloudy_intell.infrastructure.logging_utils import get_logger
 logger = get_logger(__name__)
 
 
+def invoke_with_retries(llm, prompt: str, node_name: str, retries: int = 3) -> str:
+    """Invoke an LLM prompt with bounded retries and validated text output.
+
+    Uses exponential backoff (1s, 2s, 4s) between retries.  Returns the LLM
+    response content as a string, or a formatted error message if all retries
+    fail.  This helper is used by synthesizer, debate, and IaC nodes to
+    standardize retry behavior and ensure nodes never crash the graph on
+    transient failures.
+    """
+    last_error: Exception | None = None
+    for attempt in range(retries):
+        try:
+            response = llm.invoke([SystemMessage(content=prompt)])
+            content = getattr(response, "content", "")
+            if not isinstance(content, str) or not content.strip():
+                raise ValueError(f"[{node_name}] Empty response from LLM")
+            return content
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            if attempt < retries - 1:
+                wait_time = 2**attempt
+                logger.warning(
+                    "%s LLM call failed (attempt %s/%s), retrying in %ss: %s",
+                    node_name,
+                    attempt + 1,
+                    retries,
+                    wait_time,
+                    exc,
+                )
+                time.sleep(wait_time)
+            else:
+                logger.error("%s failed after retries: %s", node_name, exc, exc_info=True)
+    return f"[{node_name}] Error: {last_error}"
+
+
 def format_component_recommendations(domain_name: str, task_info: Dict[str, Any], generated_text: Optional[str]) -> str:
     """Return architect output or a deterministic fallback skeleton.
 

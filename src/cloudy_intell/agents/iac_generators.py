@@ -15,12 +15,12 @@ Three node categories:
   IaC document with proper structure (modules, imports, variable blocks, etc.).
 """
 
-import time
 from typing import Any, Dict, cast
 
 from langchain_core.messages import SystemMessage
 
 from cloudy_intell.agents.context import RuntimeContext
+from cloudy_intell.agents.tool_execution import invoke_with_retries
 from cloudy_intell.infrastructure.llm_factory import resolve_execution_llm, resolve_reasoning_llm
 from cloudy_intell.infrastructure.logging_utils import get_logger
 from cloudy_intell.schemas.models import State
@@ -85,34 +85,6 @@ _FORMAT_INSTRUCTIONS: dict[str, dict[str, str]] = {
         ),
     },
 }
-
-
-def _invoke_with_retries(llm, prompt: str, node_name: str, retries: int = 3) -> str:
-    """Invoke an LLM with bounded retries and return the text content."""
-    last_error: Exception | None = None
-    for attempt in range(retries):
-        try:
-            response = llm.invoke([SystemMessage(content=prompt)])
-            content = getattr(response, "content", "")
-            if not isinstance(content, str) or not content.strip():
-                raise ValueError(f"[{node_name}] Empty response from LLM")
-            return content
-        except Exception as exc:  # noqa: BLE001
-            last_error = exc
-            if attempt < retries - 1:
-                wait_time = 2**attempt
-                logger.warning(
-                    "%s LLM call failed (attempt %s/%s), retrying in %ss: %s",
-                    node_name,
-                    attempt + 1,
-                    retries,
-                    wait_time,
-                    exc,
-                )
-                time.sleep(wait_time)
-            else:
-                logger.error("%s failed after retries: %s", node_name, exc, exc_info=True)
-    return f"[{node_name}] Error: {last_error}"
 
 
 # ── IaC Supervisor ───────────────────────────────────────────────────────────
@@ -222,7 +194,7 @@ Wrap all code in a single fenced code block with the appropriate language tag.
 
         try:
             exec_llm = resolve_execution_llm(ctx, state)
-            content = _invoke_with_retries(exec_llm, prompt, f"{domain}_iac_generator")
+            content = invoke_with_retries(exec_llm, prompt, f"{domain}_iac_generator")
         except Exception as exc:  # noqa: BLE001
             logger.error("[%s_iac_generator] Error: %s", domain, exc, exc_info=True)
             content = f"# Error generating {domain} IaC code: {exc}"
@@ -315,7 +287,7 @@ Merge the following per-domain {fmt['language']} code into a single, cohesive, p
 Wrap the complete output in a single fenced code block with the appropriate language tag.
 """
 
-        merged = _invoke_with_retries(
+        merged = invoke_with_retries(
             resolve_reasoning_llm(ctx, state), prompt, "iac_synthesizer"
         )
 
