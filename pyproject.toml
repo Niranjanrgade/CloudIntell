@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "bert-score>=0.3.13",
     "flashrank>=0.2.9",
     "langchain>=1.2.12",
     "langchain-anthropic>=1.4.0",
@@ -16,9 +17,14 @@ dependencies = [
     "langgraph>=1.1.2",
     "langgraph-cli[inmem]>=0.4.17",
     "langsmith>=0.7.17",
+    "matplotlib>=3.10.8",
+    "nltk>=3.9.4",
+    "pandas>=3.0.2",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.7.0",
     "python-dotenv>=1.2.2",
+    "seaborn>=0.13.2",
+    "tabulate>=0.10.0",
 ]
 
 [tool.setuptools.packages.find]
