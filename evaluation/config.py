@@ -76,6 +76,41 @@ def get_model_experiment(base: EvalConfig | None = None) -> ExperimentConfig:
     )
 
 
+@dataclass
+class RunFilter:
+    """Fine-grained filter for selecting a subset of evaluation runs."""
+
+    scenarios: list[str] | None = None
+    models: list[str] | None = None
+    versions: list[str] | None = None
+    runs: list[int] | None = None
+
+    def matches(
+        self,
+        scenario_id: str,
+        model: str,
+        version: str,
+        run: int,
+    ) -> bool:
+        """Return True if the given run matches all active filters."""
+        if self.scenarios and scenario_id not in self.scenarios:
+            return False
+        if self.models and model not in self.models:
+            return False
+        if self.versions and version not in self.versions:
+            return False
+        if self.runs and run not in self.runs:
+            return False
+        return True
+
+
+# ── Metric names ────────────────────────────────────────────────────────
+METRIC_METEOR = "meteor"
+METRIC_BERT = "bert"
+METRIC_JUDGE = "judge"
+ALL_METRICS = [METRIC_METEOR, METRIC_BERT, METRIC_JUDGE]
+
+
 def result_path(
     output_dir: str,
     scenario_id: str,
