@@ -37,13 +37,13 @@ if TYPE_CHECKING:
 def create_reasoning_llm(settings: AppSettings) -> ChatOpenAI:
     """Create the high-reasoning model used by supervisors and synthesizers."""
 
-    return ChatOpenAI(model=settings.llm_reasoning_model)
+    return ChatOpenAI(model=settings.llm_reasoning_model, temperature=0.1)
 
 
 def create_execution_llm(settings: AppSettings) -> ChatOpenAI:
     """Create the lighter execution model used by domain node calls."""
 
-    return ChatOpenAI(model=settings.llm_execution_model)
+    return ChatOpenAI(model=settings.llm_execution_model, temperature=0.1)
 
 
 @lru_cache(maxsize=32)
@@ -61,14 +61,14 @@ def get_llm(model_name: str) -> BaseChatModel:
     if provider == "anthropic":
         from langchain_anthropic import ChatAnthropic  # type: ignore[import-untyped]
 
-        return ChatAnthropic(model=model_name)
+        return ChatAnthropic(model=model_name, temperature=0.1)
 
     if provider == "google":
         from langchain_google_genai import ChatGoogleGenerativeAI  # type: ignore[import-untyped]
 
-        return ChatGoogleGenerativeAI(model=model_name)
+        return ChatGoogleGenerativeAI(model=model_name, temperature=0.1)
 
-    return ChatOpenAI(model=model_name)
+    return ChatOpenAI(model=model_name, temperature=0.1)
 
 
 def resolve_reasoning_llm(ctx, state: State) -> BaseChatModel:
