@@ -1,0 +1,43 @@
+\chapter{Conclusion and Future Work}
+
+\section{Conclusion}
+
+This project designed and implemented a multi-cloud agentic AI framework for cloud architecture generation and validation. The system integrates LangGraph-based subgraph composition, a domain-decomposed multi-agent pipeline, two-stage RAG with cross-encoder reranking, an Evaluator-Optimizer validation loop, and a dynamic model-selection mechanism spanning three frontier model families. Phase 2 extended the AWS-scoped Phase 1 prototype with Azure documentation ingestion via \texttt{git sparse-checkout}, a provider metadata registry that drives domain agent behaviour without hardcoded provider logic, IaC resource hint annotations, and a Next.js interactive user interface providing real-time workflow visualisation, side-by-side multi-cloud comparison, and a structured debate view.
+
+The empirical evaluation, conducted across five benchmark scenarios using three runner variants and three frontier language models, produced two principal findings. First, the Evaluator-Optimizer loop delivers a measurable quality uplift: the LLM judge score rises from 8.917 for a single-prompt baseline to 9.000 for an agentic system without validation, and further to 9.250 under the full iterative framework — a net improvement of 0.333 points (3.7\%) attributable solely to the validation and refinement stage. Second, all three evaluated models — GPT-5.4 (9.250), Claude Sonnet 4.6 (9.582), and Gemini 3.1 Pro (9.083) — produce architectures that score above 9.0 on the judge scale, indicating that the framework's structural scaffolding provides a robust quality baseline that is largely independent of the underlying language model. Claude Sonnet 4.6 records the highest composite score; however, as the judge model shares the same model family, a self-evaluation bias cannot be excluded, and this finding should be treated with appropriate caution pending independent multi-judge verification.
+
+Taken together, these results validate the central thesis of this work: an iterative, grounded, multi-agent architecture with structured domain decomposition and feedback-driven refinement consistently outperforms monolithic and partially agentic alternatives on technically demanding open-ended generation tasks.
+
+\section{Limitations}
+
+Several constraints on the current system merit acknowledgement.
+
+\begin{itemize}
+    \item \textbf{Documentation Currency:} The vector stores are populated from point-in-time ingestion runs. Cloud provider documentation evolves continuously, so re-ingestion pipelines must be scheduled regularly to prevent stale RAG retrievals. The Azure pipeline, which depends on \texttt{git sparse-checkout} from the MicrosoftDocs repository, incurs non-trivial network and index-rebuild overhead at each update cycle.
+
+    \item \textbf{Absence of Live Account Context:} Agent recommendations are grounded in documentation but not in the user's actual cloud environment. Service quota limits, existing resource configurations, and organisation-level permission boundaries are not visible to the agents, which may cause recommendations to be technically valid in general but inapplicable in specific deployment contexts.
+
+    \item \textbf{Judge Selection Bias:} The evaluation pipeline uses a single judge model, \texttt{claude-sonnet-4-6}, which is also one of the test models. This configuration introduces a potential self-enhancement bias that may inflate Claude's reported scores relative to GPT-5.4 and Gemini 3.1 Pro. A multi-judge ensemble with rotating evaluators would provide a statistically sounder cross-model ranking.
+
+    \item \textbf{Single-Scenario Versioning Ablation:} The framework version comparison (Section 5.4) was conducted on the \texttt{three\_tier\_web} scenario only. Extending this ablation to all five benchmark scenarios would strengthen the generalisability of the observed performance gains.
+
+    \item \textbf{API Cost Sensitivity:} Full-pipeline evaluation with high-context reranked RAG, parallel domain agents, and an LLM judge incurs substantially higher API costs than baseline approaches. Cost optimisation strategies such as prompt caching and selective tool invocation remain unexplored.
+\end{itemize}
+
+\section{Future Work}
+
+The findings from both phases open several concrete directions for continued research and engineering development.
+
+\begin{itemize}
+    \item \textbf{Google Cloud Platform Integration:} Adding GCP as a third entry in the \texttt{PROVIDER\_REGISTRY} would expand the debate matrix to a three-way comparison and enable multi-cloud recommendations that span all major hyperscalers. The provider metadata abstraction introduced in Phase 2 is intentionally designed to accommodate this extension with minimal structural changes.
+
+    \item \textbf{IaC Template Execution in Sandboxed Environments:} The current framework generates IaC resource hints as annotations within the architecture document. A natural next step is to invoke a dedicated IaC synthesis agent that emits deployable Terraform or Pulumi configurations, validates them using \texttt{terraform validate} or \texttt{pulumi preview}, and reports infrastructure-level errors back into the Evaluator-Optimizer loop.
+
+    \item \textbf{Live Account Context Injection:} Extending the UI to accept temporary cloud credentials would allow the framework to query service quotas, list existing resources, and tailor recommendations to the user's actual account state. This would transform the system from a documentation-grounded advisory tool into a context-aware deployment assistant.
+
+    \item \textbf{Multi-Judge Evaluation Ensemble:} Replacing the single \texttt{claude-sonnet-4-6} judge with a rotating panel of independent judge models (one per provider family) would mitigate self-evaluation bias and yield more reliable cross-model rankings. Agreement statistics across judges could serve as an additional quality signal.
+
+    \item \textbf{Persistent Checkpoint Backends:} The current checkpointing layer uses an in-memory \texttt{MemorySaver}, which does not survive process restarts. Migrating to a persistent backend such as PostgreSQL-backed LangGraph checkpointing would support long-running, resumable sessions and enable audit trails for compliance-sensitive use cases.
+
+    \item \textbf{Automated Scenario Generation:} The five benchmark scenarios were hand-authored. A scenario generation pipeline that systematically samples use-case combinations (provider, scale tier, connectivity model, regulatory requirement) would support broader coverage and reduce the manual overhead of benchmark maintenance.
+\end{itemize}

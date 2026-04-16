@@ -1,0 +1,123 @@
+\chapter{Implementation}
+
+This chapter describes the major implementation components of the agentic AI framework, covering the data ingestion pipeline, vector database construction with reranking, the modular provider architecture, the LangGraph orchestration design, the state management scheme, the model selection mechanism, the Next.js user interface, and the evaluation infrastructure.
+
+\section{Data Ingestion and Vector Database Construction}
+
+\subsection{AWS Documentation Pipeline}
+
+AWS documentation is gathered through a custom Python web scraping pipeline targeting \texttt{docs.aws.amazon.com}. The scraper uses \texttt{requests} and \texttt{BeautifulSoup} to discover service documentation links, probes for \texttt{meta-inf/guide-info.json} metadata files to locate direct PDF endpoints, and writes deduplicated, metadata-tagged records to a structured CSV. Services with non-standard layouts require manual identification, so the pipeline combines automated discovery with a curated supplement list.
+
+\subsection{Azure Documentation Pipeline}
+
+Unlike AWS, Microsoft hosts its documentation on GitHub under the \texttt{MicrosoftDocs} organisation. The framework exploits this structure by running \texttt{git sparse-checkout} against the relevant repositories, pulling only the Markdown files for required service categories. This approach bypasses anti-scraping measures, avoids format inconsistency, and guarantees that the ingested content matches what Microsoft's documentation portal renders.
+
+\subsection{Document Parsing and Chunking}
+
+Raw PDFs and DOCX files are converted to clean Markdown using the Docling toolkit~\cite{docling2025paper, docling2024web}. The parser resolves multi-column layouts, tables, and embedded images; non-vectorisable elements are stripped. The resulting Markdown is split using \texttt{MarkdownHeaderTextSplitter} followed by \texttt{RecursiveCharacterTextSplitter} from LangChain, which respects heading boundaries before falling back to character-count limits. Each chunk retains source URL, service name, and cloud provider as metadata, enabling filtered retrieval.
+
+\subsection{Embedding and Indexing}
+
+The \texttt{nomic-embed-text} model, served locally through Ollama \cite{ollama2024web}, generates dense vector embeddings for each chunk. On Apple Silicon hardware, the embedding computation uses PyTorch's MPS backend~\cite{apple2024mps} for native GPU acceleration. Embeddings are stored in provider-scoped ChromaDB collections~\cite{chromadb2024}---one collection for AWS documentation and a separate collection for Azure---each persisted as an on-disk SQLite store that is loaded once at application startup without recomputation.
+
+\subsection{Two-Stage Retrieval with Cross-Encoder Reranking}
+
+At query time the \texttt{rag\_search\_function} executes a two-stage retrieval protocol. First, ChromaDB returns the top $k \times m$ candidates by cosine similarity (where $m$ is a configurable multiplier, defaulting to 4). Second, FlashRank applies the \texttt{ms-marco-MiniLM-L-12-v2} cross-encoder to score each candidate passage jointly with the query, and only the top $k$ passages survive. The cross-encoder's joint attention mechanism captures relevance signals that bi-encoder cosine similarity misses for fine-grained technical terminology. The \texttt{Ranker} instance is cached across calls to avoid reloading model weights for each retrieval.
+
+\section{Provider Metadata Registry}
+
+A central design decision in Phase 2 is separating cloud-provider knowledge from agent and graph code. All provider-specific information is encapsulated in a frozen \texttt{ProviderMeta} dataclass:
+
+\begin{itemize}
+    \item \textbf{Domain services}: Maps each architecture domain (compute, network, storage, database) to a comma-separated string of representative services, used to populate supervisor system prompts.
+    \item \textbf{Validation checks}: Maps each domain to a numbered checklist of validation criteria that domain validator agents follow.
+    \item \textbf{IaC resource hints}: Maps each domain to canonical Terraform (or Bicep) resource type names. For example, the AWS compute domain maps to \texttt{aws\_instance}, \texttt{aws\_lambda\_function}, \texttt{aws\_ecs\_service}, and related resources. These hints are injected into the final architecture generator prompt, enabling it to include IaC stubs directly in the output document.
+    \item \textbf{Supported IaC formats}: A tuple such as \texttt{("terraform", "cloudformation")} for AWS or \texttt{("terraform", "bicep")} for Azure.
+    \item \textbf{RAG tool description}: Provider-scoped text bound to the RAG tool so the LLM understands which documentation corpus the tool interrogates.
+\end{itemize}
+
+Two entries are registered---\texttt{AWS\_META} and \texttt{AZURE\_META}---in the \texttt{PROVIDER\_REGISTRY} dictionary. The \texttt{ArchitectureService} resolves the active provider at startup from the \texttt{provider\_mode} setting (\texttt{"aws"}, \texttt{"azure"}, or \texttt{"both"}). Adding Google Cloud Platform in a future phase requires only defining a \texttt{GCP\_META} entry and updating the registry.
+
+\section{Agentic Workflow and Graph Orchestration}
+
+\subsection{Subgraph Composition}
+
+The top-level graph, assembled in \texttt{builder.py}, adds two compiled subgraphs as nodes: \texttt{architect\_phase} and \texttt{validator\_phase}. Each subgraph is a fully independent \texttt{StateGraph} compiled separately, encapsulating its own fan-out/fan-in wiring. The parent graph connects them linearly with a conditional edge after the validator phase routing to either another architect cycle or the final generator. This architecture scales cleanly: adding a new phase (e.g., a cost-estimation phase) requires inserting one node and two edges in the parent graph without touching either subgraph.
+
+\subsection{Supervisor Agent}
+
+The \texttt{architect\_supervisor} node factory binds the supervisor logic to the runtime context at graph build time and returns a \texttt{\_node} closure. On the first iteration, it decomposes the user problem into a \texttt{TaskDecomposition} (validated via Pydantic structured output). On subsequent iterations, it incorporates the previous cycle's validation summary and per-domain feedback, adjusting task descriptions to address identified factual errors. Upon returning its state update, it explicitly resets \texttt{validation\_feedback}, \texttt{architecture\_components}, and \texttt{proposed\_architecture} to empty structures so parallel domain agents start fresh rather than merging onto stale data.
+
+\subsection{Domain Architect Agents}
+
+The \texttt{create\_domain\_architect} factory produces a node function for each of the four domains. Each function retrieves its domain-specific task from the state, builds a system prompt using the provider's domain service list and the task deliverables, and invokes the execution-tier LLM inside a bounded tool-calling loop. The loop is implemented in \texttt{tool\_execution.py}: after each LLM call, outstanding tool calls are dispatched to either the web search or RAG search tool, and the result messages are appended to the conversation context. The loop terminates when the LLM returns no further tool calls or when the iteration ceiling is reached, at which point the agent extracts a final content response. LLM failures trigger exponential backoff retries up to a configurable limit.
+
+\subsection{Architect Synthesizer}
+
+The \texttt{architect\_synthesizer} waits for all four domain agents (fan-in). It receives the full domain-component dictionary merged by \texttt{merge\_dicts} reducers and instructs the reasoning-tier LLM to produce a unified architecture narrative resolving cross-domain dependencies and surface incompatibilities.
+
+\subsection{Validator Supervisor and Domain Validators}
+
+The \texttt{validator\_supervisor} generates a \texttt{ValidationDecomposition}: a list of \texttt{ValidationTask} objects identifying which components of the proposed architecture each domain validator should scrutinise and what validation focus to apply (e.g., configuration correctness, security best practices). Domain validators follow the same tool-calling loop but with only the RAG search tool bound, ensuring that validation feedback is grounded in the documentation corpus rather than potentially stale or incorrect web search results.
+
+\subsection{Validation Synthesizer and Iteration Routing}
+
+The \texttt{validation\_synthesizer} aggregates per-domain validation results and sets the \texttt{factual\_errors\_exist} boolean in state. The \texttt{iteration\_condition} function then inspects the current iteration count against the configured minimum and maximum bounds, together with the error flag, and returns either \texttt{"iterate"} or \texttt{"finish"} as the routing key for the conditional edge. This is the direct implementation of the Evaluator-Optimizer loop from Phase 1.
+
+\section{State Management}
+
+The LangGraph \texttt{State} is a Python \texttt{TypedDict} in which each field is annotated with a custom reducer function. Reducers govern how partial state updates from concurrently executing nodes are merged:
+
+\begin{itemize}
+    \item \textbf{\texttt{merge\_dicts}}: Applied to \texttt{architecture\_components}, \texttt{architecture\_domain\_tasks}, and \texttt{proposed\_architecture}. When two domain agents both return a dict keyed by their domain name (e.g., \texttt{\{"compute": \{...\}\}} and \texttt{\{"network": \{...\}\}}), \texttt{merge\_dicts} combines them into a single dict rather than the default last-write-wins behaviour. This enables true parallel fan-out without coordination.
+    \item \textbf{\texttt{last\_value}}: Applied to scalar fields such as \texttt{user\_problem}, \texttt{iteration\_count}, \texttt{architecture\_summary}, and model selection flags. Only the most recent write is retained.
+    \item \textbf{\texttt{or\_reducer}}: Applied to \texttt{design\_flaws\_exist}. If any domain validator reports design flaws, the flag remains True for the rest of the iteration.
+    \item \textbf{\texttt{overwrite\_bool}}: Applied to \texttt{factual\_errors\_exist}. Unlike \texttt{or\_reducer}, this allows the supervisor to explicitly clear the flag at the start of a fresh iteration, resetting validator results.
+    \item \textbf{\texttt{validation\_feedback\_reducer}}: Handles the domain-aware deduplication of validator outputs. When a validator re-runs for the same domain in a second iteration, its new feedback replaces the stale entry rather than duplicating it, keeping the feedback list compact.
+\end{itemize}
+
+\section{Model Selection Mechanism}
+
+The model catalog in \texttt{config/models.py} defines nine selectable models across three providers, each tagged with a tier (reasoning or execution) and a description. The \texttt{get\_llm(model\_name)} function instantiates the appropriate LangChain chat class---\texttt{ChatOpenAI}, \texttt{ChatAnthropic}, or \texttt{ChatGoogleGenerativeAI}---and caches the instance with \texttt{functools.lru\_cache} to avoid redundant object creation during a long session.
+
+At request time, the UI submits optional \texttt{reasoning\_model} and \texttt{execution\_model} fields in the streaming run body. These are written into the LangGraph state with \texttt{last\_value} reducers. Helper functions \texttt{resolve\_reasoning\_llm(ctx, state)} and \texttt{resolve\_execution\_llm(ctx, state)} check the state for per-run overrides first, then fall back to the context's base LLM. Because tool bindings are LLM-specific, the \texttt{rebind\_tools(bundle, new\_llm)} utility creates a new \texttt{ToolBundle} with the overriding LLM bound to the same underlying tool definitions, avoiding reconstruction of the ChromaDB connection or Serper wrapper.
+
+\section{Interactive User Interface}
+
+The frontend is built with Next.js 15 and communicates with the LangGraph server via SDK streaming. Key components include:
+
+\begin{itemize}
+    \item \textbf{WorkflowGraph}: A React Flow canvas rendering the full agent pipeline as an interactive directed graph. Custom node types (agent, tool, decision, start/end) display real-time status (idle, active, completed) driven by the \texttt{useRunOrchestration} hook, which maps backend node identifiers to UI node IDs via a provideragnostic lookup table.
+    \item \textbf{SidebarNavigator}: Left sidebar providing navigation across four views (AWS architecture, Azure architecture, Compare, Debate) and a collapsible model selection panel. The panel exposes separate dropdowns for the reasoning and execution tiers, with models grouped by provider and tier-matched models ranked first in each list.
+    \item \textbf{CompareView}: A side-by-side layout comparing the AWS and Azure architecture summaries produced from the same user problem, highlighting service-level correspondences across domains.
+    \item \textbf{IaCGenerationPanel}: Displays Infrastructure-as-Code stubs for the generated architecture. The panel queries the \texttt{/api/iac} route which invokes the final generator with IaC resource hints from the active provider's \texttt{ProviderMeta}.
+    \item \textbf{CopilotSidebar}: A conversational interface backed by the streaming run API, allowing architects to submit problems and receive streamed output as the agent graph executes.
+\end{itemize}
+
+The Next.js API layer exposes routes for thread creation (\texttt{/api/threads}), streaming run execution (\texttt{/api/runs/stream}), state retrieval (\texttt{/api/threads/[threadId]/state}), and the model catalog (\texttt{/api/models}).
+
+\section{Evaluation Infrastructure}
+
+\subsection{Benchmark Scenarios}
+
+Five benchmark problems drawn from public AWS architecture blog posts represent diverse real-world patterns: (1) a three-tier serverless web application with CDN, API management, authentication, and NoSQL storage; (2) a serverless data lake ingesting streaming events through managed compute into a columnar data warehouse; (3) a multi-region disaster recovery topology with cross-region replication; (4) a containerised microservices platform with service mesh, container registry, and secrets management; and (5) an event-driven pipeline connecting IoT sensors to real-time and batch processing stages. Each scenario provides a reference architecture text and a list of expected services used to assess coverage.
+
+\subsection{Runner Variants}
+
+Three runner modules enable controlled ablation across framework configurations:
+
+\begin{itemize}
+    \item \textbf{Baseline Runner}: Submits the user problem to a single LLM call with no tool access, producing a zero-shot architecture recommendation.
+    \item \textbf{Agentic Runner}: Executes the architect subgraph only (supervisor $\rightarrow$ four domain agents $\rightarrow$ synthesizer), without any validator phase or iteration. This isolates the value of multi-agent decomposition and web search tool use.
+    \item \textbf{Framework Runner}: Executes the full graph with configurable minimum and maximum iterations, giving the complete Evaluator-Optimizer loop.
+\end{itemize}
+
+For cross-model comparison, the framework runner sets both the reasoning and execution LLM to the same model, ensuring a fair comparison without confounding from different tier assignments.
+
+\subsection{LLM-as-a-Judge Evaluation}
+
+Each runner's output is scored by an independent judge model using the six-dimension rubric described in Chapter 5. The judge receives the problem statement, the reference architecture from the benchmark scenario, and the generated text, and returns integer scores for each dimension. To avoid self-evaluation bias where a model judges its own output, the judge model used during the main evaluation run was independent; the practical selection considerations and their impact on scores are discussed in Chapter 5.
+
+\section{Robustness Features}
+
+All LLM calls include exponential backoff retry logic with a configurable maximum attempt count. Tool-calling loops enforce per-agent iteration ceilings and wall-clock timeouts to prevent runaway cost. Message histories are pruned to prevent context bloat during multi-iteration runs. LangSmith tracing is configurable via environment variable, recording full agent traces for post-hoc debugging of non-deterministic execution paths.

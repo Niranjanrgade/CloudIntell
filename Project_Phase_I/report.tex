@@ -1,0 +1,205 @@
+\documentclass[12pt,a4wide]{report}
+
+\usepackage{amsthm,amssymb,mathrsfs,setspace,pstcol}%amsmath, latexsym,footmisc
+
+\usepackage{epsfig}
+\usepackage[nottoc]{tocbibind}
+\usepackage{graphicx} % Added for images
+\usepackage{booktabs} % Added for professional tables
+\usepackage[T1]{fontenc} % For proper URL formatting
+\usepackage{url} % Added for URLs in bib
+\usepackage{float}
+
+\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
+\renewcommand{\sectionmark}[1]{\markright{\thesection\ #1}}
+%
+
+\input xy
+\xyoption{all}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{proposition}[theorem]{Proposition}
+\theoremstyle{definition}
+
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{notation}[theorem]{Notation}
+
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\renewcommand{\baselinestretch}{1.5}
+\begin{document}
+
+%\pagenumbering{arabic} \setcounter{page}{1}
+
+% --------------- Title page -----------------------
+\begin{titlepage}
+\enlargethispage{2cm}
+
+\begin{center}
+
+\vspace*{-1cm}
+
+\textbf{\Large AN AGENTIC AI FRAMEWORK FOR MULTI CLOUD SOLUTION RECOMMENDATION, ARCHITECTURE DESIGN AND OPTIMIZATION}\\[10pt]
+
+\vspace*{0.25cm}
+
+
+                         A Project Report Submitted \\
+                     in Partial Fulfilment of the Requirements  \\
+                     for the Degree of  \\
+                          \vspace{4.5mm}
+                   {\Large \bf Master of Technology } \\
+                   in \\
+                   {\large \bf  Computer Science and Engineering with Specialization} \\
+                    in \\
+                   {\large \bf  Big Data \& Machine Learning} \\
+                      \vspace{7mm}
+                   {\em  by} \\ \vspace{2.5mm}
+             {\large \bf Niranjan Gade} \\
+{\large \bf (Roll No. 2023MCS320001)}\\[.35in]
+
+\vfill
+%\includegraphics[width=12cm, height=12cm]{iiserlogo}
+
+\begin{figure}[h]
+% \includegraphics[width=15mm,height=10mm]{time_arma_gs.jpg}
+  \begin{center}
+  \includegraphics[width=6cm, height=3cm]{logo2.jpg}
+  \end{center}
+\end{figure}
+\vspace*{0.2cm}
+
+{\em\large to }\\%[8pt]
+{\bf\large \mbox{INDIAN INSTITUTE OF INFORMATION TECHNOLOGY }}\\%[4pt]
+{\bf\large KOTTAYAM-686635, INDIA}\\%[8pt]
+{\it\large November 2025}
+\end{center}
+
+\end{titlepage}
+
+\clearpage
+% --------------- Declaration  page -----------------------
+\pagenumbering{roman} \setcounter{page}{2}
+\begin{center}
+{\large{\bf{DECLARATION}}}
+\end{center}
+%\thispagestyle{empty}
+
+
+\noindent I, \textbf{Niranjan Gade} (\textbf{Roll No: 2023MCS320001}), hereby declare that, this report entitled
+\textbf{``An Agentic AI Framework for Multi Cloud Solution Recommendation, Architecture Design and Optimization''} submitted to Indian
+Institute of Information Technology Kottayam towards partial
+requirement of {\bf Master of Technology} in \textbf{Big Data \& Machine Learning}
+is an original work carried out by me under the supervision of
+\textbf{Dr. Christina Terese Joseph} and has not formed the basis for the award
+of any degree or diploma, in this or any other institution or
+university. I have sincerely tried to uphold the academic ethics
+and honesty. Whenever an external information or statement or
+result is used then, that have been duly acknowledged and cited.
+
+% 1. Space between text and signature image
+
+\vspace{1.5cm} 
+
+
+
+% 2. The Signature Image
+
+% \hfill pushes the image to the right side
+
+\noindent \hfill \includegraphics[width=4cm]{SIGNATURE0.jpg} 
+
+
+
+% 3. Small adjustment to bring the name closer to the signature (optional)
+
+\vspace{-0.5cm} 
+
+\noindent Kottayam-686635 \hfill \textbf{Niranjan Gade}
+
+\noindent November 2025
+
+\clearpage
+
+
+% --------------- Certificate page -----------------------
+\pagenumbering{roman} \setcounter{page}{3}
+\begin{center}
+{\large{\bf{CERTIFICATE}}}
+\end{center}
+%\thispagestyle{empty}
+
+
+\noindent This is to certify that the work contained in this
+project report entitled \textbf{``An Agentic AI Framework for Multi Cloud Solution Recommendation, Architecture Design and Optimization''}
+submitted by \textbf{Niranjan Gade} (\textbf{Roll No: 2023MCS320001}) to Indian Institute of Information Technology Kottayam
+towards partial requirement of {\bf Master of Technology} in
+\textbf{Big Data \& Machine Learning} has been carried out by him under my
+supervision and that it has not been submitted elsewhere for the
+award of any degree.
+
+
+\vspace{4cm}
+
+\noindent Kottayam-686635  \hfill Dr. Christina Terese Joseph
+
+\noindent November 2025 \hfill Project Supervisor
+
+\clearpage
+
+
+
+
+
+
+% --------------- Abstract page -----------------------
+\begin{center}
+{\Large{\bf{ABSTRACT}}}
+\end{center}
+
+
+This project is creating an agentic AI framework to generate, validate, and optimize multi-cloud architectures. This report covers the design and implementation of the core agent workflow and system architecture for the proposed framework.
+
+The project proposes an agentic AI system designed to support solution architects. It introduces an Evaluator-Optimizer workflow, which validates and improves recommendations using Retrieval Augmented Generation (RAG) grounded in vendor documentation. The system is built as a multi-agent framework where specialist agents collaborate to decompose a user query, generate a draft architecture, validate it against technical documentation, and iterate until a reliable solution is achieved.
+
+The core technologies involved are Large Language Models (LLMs), multi-agent frameworks (LangGraph), and vector database (Chroma). The project delivers a functional prototype that provides efficient, secure, and cost-optimized cloud solutions. Quantitative evaluation utilizing ROUGE-L, METEOR, and BERTScore metrics demonstrates the effectiveness of the Evaluator-Optimizer workflow in improving the semantic quality and factual grounding of the generated solutions through iterative validation.
+
+\clearpage
+
+
+
+\tableofcontents
+\clearpage
+\listoffigures
+\listoftables
+
+
+\newpage
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\input{1_Introduction}
+
+\input{2_LiteratureReview}
+
+\input{3_SystemDesignAndMethodology}
+
+\input{4_Implementation}
+
+\input{5_Results}
+
+\input{6_Conclusion}
+
+
+\nocite{golub} \nocite{gerla}\nocite{m1}\nocite{chang}
+\bibliographystyle{plain}
+\bibliography{bib}
+
+\end{document}
+

@@ -1,0 +1,205 @@
+\documentclass[12pt,a4wide]{report}
+
+\usepackage{amsthm,amssymb,mathrsfs,setspace,pstcol}%amsmath, latexsym,footmisc
+
+\usepackage{epsfig}
+\usepackage[nottoc]{tocbibind}
+\usepackage{graphicx} % Added for images
+\usepackage{booktabs} % Added for professional tables
+\usepackage[T1]{fontenc} % For proper URL formatting
+\usepackage{url} % Added for URLs in bib
+\usepackage{float}
+
+\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
+\renewcommand{\sectionmark}[1]{\markright{\thesection\ #1}}
+%
+
+\input xy
+\xyoption{all}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{proposition}[theorem]{Proposition}
+\theoremstyle{definition}
+
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{notation}[theorem]{Notation}
+
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\renewcommand{\baselinestretch}{1.5}
+\begin{document}
+
+%\pagenumbering{arabic} \setcounter{page}{1}
+
+% --------------- Title page -----------------------
+\begin{titlepage}
+\enlargethispage{2cm}
+
+\begin{center}
+
+\vspace*{-1cm}
+
+\textbf{\Large AN AGENTIC AI FRAMEWORK FOR MULTI CLOUD SOLUTION RECOMMENDATION, ARCHITECTURE DESIGN AND OPTIMIZATION}\\[10pt]
+
+\vspace*{0.25cm}
+
+
+                         A Project Report Submitted \\
+                     in Partial Fulfilment of the Requirements  \\
+                     for the Degree of  \\
+                          \vspace{4.5mm}
+                   {\Large \bf Master of Technology } \\
+                   in \\
+                   {\large \bf  Computer Science and Engineering with Specialization} \\
+                    in \\
+                   {\large \bf  Big Data \& Machine Learning} \\
+                      \vspace{7mm}
+                   {\em  by} \\ \vspace{2.5mm}
+             {\large \bf Niranjan Gade} \\
+{\large \bf (Roll No. 2023MCS320001)}\\[.35in]
+
+\vfill
+%\includegraphics[width=12cm, height=12cm]{iiserlogo}
+
+\begin{figure}[h]
+% \includegraphics[width=15mm,height=10mm]{time_arma_gs.jpg}
+  \begin{center}
+  \includegraphics[width=6cm, height=3cm]{logo2.jpg}
+  \end{center}
+\end{figure}
+\vspace*{0.2cm}
+
+{\em\large to }\\%[8pt]
+{\bf\large \mbox{INDIAN INSTITUTE OF INFORMATION TECHNOLOGY }}\\%[4pt]
+{\bf\large KOTTAYAM-686635, INDIA}\\%[8pt]
+{\it\large November 2025}
+\end{center}
+
+\end{titlepage}
+
+\clearpage
+% --------------- Declaration  page -----------------------
+\pagenumbering{roman} \setcounter{page}{2}
+\begin{center}
+{\large{\bf{DECLARATION}}}
+\end{center}
+%\thispagestyle{empty}
+
+
+\noindent I, \textbf{Niranjan Gade} (\textbf{Roll No: 2023MCS320001}), hereby declare that, this report entitled
+\textbf{``An Agentic AI Framework for Multi Cloud Solution Recommendation, Architecture Design and Optimization''} submitted to Indian
+Institute of Information Technology Kottayam towards partial
+requirement of {\bf Master of Technology} in \textbf{Big Data \& Machine Learning}
+is an original work carried out by me under the supervision of
+\textbf{Dr. Christina Terese Joseph} and has not formed the basis for the award
+of any degree or diploma, in this or any other institution or
+university. I have sincerely tried to uphold the academic ethics
+and honesty. Whenever an external information or statement or
+result is used then, that have been duly acknowledged and cited.
+
+% 1. Space between text and signature image
+
+\vspace{1.5cm} 
+
+
+
+% 2. The Signature Image
+
+% \hfill pushes the image to the right side
+
+\noindent \hfill \includegraphics[width=4cm]{SIGNATURE0.jpg} 
+
+
+
+% 3. Small adjustment to bring the name closer to the signature (optional)
+
+\vspace{-0.5cm} 
+
+\noindent Kottayam-686635 \hfill \textbf{Niranjan Gade}
+
+\noindent November 2025
+
+\clearpage
+
+
+% --------------- Certificate page -----------------------
+\pagenumbering{roman} \setcounter{page}{3}
+\begin{center}
+{\large{\bf{CERTIFICATE}}}
+\end{center}
+%\thispagestyle{empty}
+
+
+\noindent This is to certify that the work contained in this
+project report entitled \textbf{``An Agentic AI Framework for Multi Cloud Solution Recommendation, Architecture Design and Optimization''}
+submitted by \textbf{Niranjan Gade} (\textbf{Roll No: 2023MCS320001}) to Indian Institute of Information Technology Kottayam
+towards partial requirement of {\bf Master of Technology} in
+\textbf{Big Data \& Machine Learning} has been carried out by him under my
+supervision and that it has not been submitted elsewhere for the
+award of any degree.
+
+
+\vspace{4cm}
+
+\noindent Kottayam-686635  \hfill Dr. Christina Terese Joseph
+
+\noindent November 2025 \hfill Project Supervisor
+
+\clearpage
+
+
+
+
+
+
+% --------------- Abstract page -----------------------
+\begin{center}
+{\Large{\bf{ABSTRACT}}}
+\end{center}
+
+
+This project presents the complete design, implementation, and empirical evaluation of an agentic AI framework for cloud architecture generation and validation. Built as a direct extension of the Phase~1 prototype, this report documents the expansion from a single-provider AWS system to a fully operational multi-cloud platform supporting both Amazon Web Services and Microsoft Azure.
+
+The central contribution is a four-stage pipeline orchestrated using LangGraph subgraphs: an architect phase that decomposes user requirements across computation, networking, storage, and database domains; a validator phase that fact-checks each domain's proposal against official vendor documentation retrieved through cross-encoder reranked ChromaDB vector stores; a conditional iteration loop that drives further refinement when validation identifies factual errors; and a final synthesis stage that compiles a deployable architectural document. The system additionally exposes a provider metadata registry enabling Infrastructure-as-Code generation hints for Terraform and native provider formats.
+
+Evaluation was conducted across five real-world architectural scenarios using three frontier language model families---GPT-5.4, Claude Sonnet 4.6, and Gemini 3.1 Pro---under an LLM-as-a-Judge assessment framework scoring six dimensions aligned with the AWS Well-Architected Framework. Results establish that structured iterative validation produces a measurable quality gain over single-pass generation (judge total: 8.92 baseline to 9.25 with the full Evaluator-Optimizer loop). Claude Sonnet 4.6 achieved the highest aggregate judge score of 9.58 across scenarios, with GPT-5.4 and Gemini 3.1 Pro scoring 9.25 and 9.08 respectively; a methodological limitation concerning the use of Claude as both a generating and judging model is identified and discussed. An interactive Next.js user interface complements the backend, providing real-time workflow visualization, side-by-side provider comparison, and per-run model selection for both the reasoning and execution tiers.
+
+\clearpage
+
+
+
+\tableofcontents
+\clearpage
+\listoffigures
+\listoftables
+
+
+\newpage
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\input{1_Introduction}
+
+\input{2_LiteratureReview}
+
+\input{3_SystemDesignAndMethodology}
+
+\input{4_Implementation}
+
+\input{5_Results}
+
+\input{6_Conclusion}
+
+
+\nocite{golub} \nocite{gerla}\nocite{m1}\nocite{chang}
+\bibliographystyle{plain}
+\bibliography{bib}
+
+\end{document}
+
