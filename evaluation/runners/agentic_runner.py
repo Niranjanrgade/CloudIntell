@@ -16,7 +16,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.graph import END, START, StateGraph
 
 from cloudy_intell.agents.context import RuntimeContext
-from cloudy_intell.config.provider_meta import PROVIDER_REGISTRY, ProviderName
+from cloudy_intell.config.provider_meta import PROVIDER_REGISTRY
 from cloudy_intell.config.settings import get_settings
 from cloudy_intell.graph.subgraphs import build_architect_subgraph
 from cloudy_intell.infrastructure.llm_factory import get_llm
@@ -40,7 +40,7 @@ class AgenticResult:
 def _build_runtime_context(model_name: str, provider: str) -> RuntimeContext:
     """Build a RuntimeContext with both LLMs set to *model_name*."""
     settings = get_settings()
-    provider_meta = PROVIDER_REGISTRY[ProviderName(provider)]  # type: ignore[call-overload]
+    provider_meta = PROVIDER_REGISTRY[provider]  # type: ignore[index]
 
     llm = get_llm(model_name)
     vector_store = create_vector_store(settings, provider)

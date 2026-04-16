@@ -17,8 +17,10 @@ from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
-# Default model recommended by BERTScore authors for English
-_DEFAULT_MODEL = "microsoft/deberta-xlarge-mnli"
+# Default model — roberta-large is well-supported across platforms
+# and avoids overflow issues that deberta-xlarge-mnli has with long texts
+# on Apple Silicon.
+_DEFAULT_MODEL = "roberta-large"
 
 
 @dataclass(frozen=True)

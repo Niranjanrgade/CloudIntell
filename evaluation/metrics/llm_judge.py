@@ -1,8 +1,8 @@
 """LLM-as-Judge evaluation metric.
 
-Uses a fixed judge model (GPT-4o by default) to score generated architectures
-on six domain-specific dimensions.  The judge is independent from the models
-being tested to avoid self-evaluation bias.
+Uses a fixed judge model (Claude Sonnet 4 by default) to score generated
+architectures on six domain-specific dimensions.  The judge is independent
+from the models being tested to avoid self-evaluation bias.
 
 The six scoring dimensions are aligned with the AWS Well-Architected Framework
 pillars and cloud architecture best practices, making the evaluation
@@ -102,7 +102,7 @@ def evaluate_with_judge(
     generated: str,
     reference: str,
     problem: str,
-    judge_model: str = "gpt-4o",
+    judge_model: str = "claude-sonnet-4-6",
 ) -> JudgeResult:
     """Score a generated architecture using an independent LLM judge.
 

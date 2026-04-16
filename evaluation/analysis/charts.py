@@ -39,7 +39,7 @@ plt.rcParams.update({
     "savefig.pad_inches": 0.1,
 })
 
-VERSION_LABELS = {"baseline": "Baseline", "agentic": "Agentic", "framework": "Framework"}
+VERSION_LABELS = {"baseline": "Single Prompt LLM", "agentic": "Agentic Framework", "framework": "Evaluator Optimiser Loop Framework"}
 MODEL_LABELS = {
     "gpt-5.4": "GPT-5.4",
     "claude-sonnet-4-6": "Claude Sonnet 4.6",
@@ -208,7 +208,7 @@ def chart_model_grouped_bar(
 
     ax.set_xlabel("Metric")
     ax.set_ylabel("Score")
-    ax.set_title("Model Comparison (Framework)")
+    ax.set_title("Model Comparison (Evaluator Optimiser Loop Framework)")
     ax.set_xticks(x + width)
     ax.set_xticklabels(metric_names)
     ax.legend()
@@ -258,7 +258,7 @@ def chart_model_radar(
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(dim_labels)
     ax.set_ylim(0, 10)
-    ax.set_title("LLM Judge Dimension Profiles (Framework)", pad=20)
+    ax.set_title("LLM Judge Dimension Profiles (Evaluator Optimiser Loop Framework)", pad=20)
     ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
 
     return _save(fig, output_dir, "chart_model_radar")
@@ -270,15 +270,20 @@ def chart_model_heatmap(
 ) -> list[str]:
     """Chart 5: Heatmap — LLM Judge dimensions by model (Framework)."""
     dims = [
-        ("judge_completeness", "Comp."),
+        ("judge_completeness", "Completeness"),
         ("judge_technical_accuracy", "Accuracy"),
         ("judge_security", "Security"),
-        ("judge_scalability", "Scalab."),
-        ("judge_best_practices", "Best Pr."),
-        ("judge_specificity", "Specif."),
+        ("judge_scalability", "Scalability"),
+        ("judge_best_practices", "Best Practices"),
+        ("judge_specificity", "Specificity"),
         ("judge_total", "Total"),
     ]
-    models = sorted(model_df["model"].unique())
+    # Fixed order: Claude on top, GPT in middle, Gemini at bottom
+    preferred_order = ["claude-sonnet-4-6", "gpt-5.4", "gemini-3.1-pro-preview"]
+    available = set(model_df["model"].unique())
+    models = [m for m in preferred_order if m in available]
+    # Append any unexpected models at the end
+    models.extend(m for m in sorted(available) if m not in models)
 
     matrix = []
     row_labels = []
@@ -302,21 +307,151 @@ def chart_model_heatmap(
 
     ax.set_xticks(np.arange(len(col_labels)))
     ax.set_yticks(np.arange(len(row_labels)))
-    ax.set_xticklabels(col_labels)
+    xlabels = ax.set_xticklabels(col_labels, rotation=45, ha="right")
+    xlabels[-1].set_fontweight("bold")
     ax.set_yticklabels(row_labels)
 
-    # Annotate cells with values
+    # Annotate cells with values (2 decimal places for Total column)
+    total_col_idx = len(col_labels) - 1
     for i in range(len(row_labels)):
         for j in range(len(col_labels)):
             val = matrix_np[i, j]
             color = "white" if val > 6.5 else "black"
-            ax.text(j, i, f"{val:.1f}", ha="center", va="center", color=color, fontsize=10)
+            fmt = f"{val:.2f}" if j == total_col_idx else f"{val:.1f}"
+            weight = "bold" if j == total_col_idx else "normal"
+            ax.text(j, i, fmt, ha="center", va="center", color=color,
+                    fontsize=10, fontweight=weight)
 
     fig.colorbar(im, ax=ax, label="Score (1-10)")
-    ax.set_title("LLM Judge Dimension Scores by Model (Framework)")
+    ax.set_title("LLM Judge Dimension Scores by Model (Evaluator Optimiser Loop Framework)")
+    fig.tight_layout()
 
     return _save(fig, output_dir, "chart_model_heatmap")
 
+
+def chart_version_heatmap(
+    version_df: pd.DataFrame,
+    output_dir: str,
+) -> list[str]:
+    """Chart 6: Heatmap — LLM Judge dimensions by version (GPT-5.4)."""
+    dims = [
+        ("judge_completeness", "Completeness"),
+        ("judge_technical_accuracy", "Accuracy"),
+        ("judge_security", "Security"),
+        ("judge_scalability", "Scalability"),
+        ("judge_best_practices", "Best Practices"),
+        ("judge_specificity", "Specificity"),
+        ("judge_total", "Total"),
+    ]
+    # Fixed order: Evaluator Optimiser Loop Framework on top, Agentic Framework in middle, Single Prompt LLM at bottom
+    preferred_order = ["framework", "agentic", "baseline"]
+    available = set(version_df["version"].unique())
+    versions = [v for v in preferred_order if v in available]
+    versions.extend(v for v in sorted(available) if v not in versions)
+
+    matrix = []
+    row_labels = []
+    for version in versions:
+        subset = version_df[version_df["version"] == version]
+        row = []
+        for dk, _ in dims:
+            mean_col = f"{dk}_mean"
+            if mean_col in subset.columns:
+                row.append(subset[mean_col].mean())
+            else:
+                row.append(0)
+        matrix.append(row)
+        row_labels.append(VERSION_LABELS.get(version, version))
+
+    matrix_np = np.array(matrix)
+    col_labels = [d[1] for d in dims]
+
+    fig, ax = plt.subplots(figsize=(9, 4))
+    im = ax.imshow(matrix_np, cmap="YlGnBu", aspect="auto", vmin=1, vmax=10)
+
+    ax.set_xticks(np.arange(len(col_labels)))
+    ax.set_yticks(np.arange(len(row_labels)))
+    xlabels = ax.set_xticklabels(col_labels, rotation=45, ha="right")
+    xlabels[-1].set_fontweight("bold")
+    ax.set_yticklabels(row_labels)
+
+    # Annotate cells with values (2 decimal places for Total column)
+    total_col_idx = len(col_labels) - 1
+    for i in range(len(row_labels)):
+        for j in range(len(col_labels)):
+            val = matrix_np[i, j]
+            color = "white" if val > 6.5 else "black"
+            fmt = f"{val:.2f}" if j == total_col_idx else f"{val:.1f}"
+            weight = "bold" if j == total_col_idx else "normal"
+            ax.text(j, i, fmt, ha="center", va="center", color=color,
+                    fontsize=10, fontweight=weight)
+
+    fig.colorbar(im, ax=ax, label="Score (1-10)")
+    ax.set_title("LLM Judge Dimension Scores by Version (GPT-5.4)")
+    fig.tight_layout()
+
+    return _save(fig, output_dir, "chart_version_heatmap")
+
+def chart_combined_heatmap(
+    agg_df: pd.DataFrame,
+    output_dir: str,
+) -> list[str]:
+    """Chart 7: Heatmap — LLM Judge dimensions by version, averaged across all models."""
+    dims = [
+        ("judge_completeness", "Completeness"),
+        ("judge_technical_accuracy", "Accuracy"),
+        ("judge_security", "Security"),
+        ("judge_scalability", "Scalability"),
+        ("judge_best_practices", "Best Practices"),
+        ("judge_specificity", "Specificity"),
+        ("judge_total", "Total"),
+    ]
+    preferred_order = ["framework", "agentic", "baseline"]
+    available = set(agg_df["version"].unique())
+    versions = [v for v in preferred_order if v in available]
+    versions.extend(v for v in sorted(available) if v not in versions)
+
+    matrix = []
+    row_labels = []
+    for version in versions:
+        subset = agg_df[agg_df["version"] == version]
+        row = []
+        for dk, _ in dims:
+            mean_col = f"{dk}_mean"
+            if mean_col in subset.columns and not subset[mean_col].isna().all():
+                row.append(subset[mean_col].mean())
+            else:
+                row.append(0)
+        matrix.append(row)
+        row_labels.append(VERSION_LABELS.get(version, version))
+
+    matrix_np = np.array(matrix)
+    col_labels = [d[1] for d in dims]
+
+    fig, ax = plt.subplots(figsize=(9, 4))
+    im = ax.imshow(matrix_np, cmap="YlGnBu", aspect="auto", vmin=1, vmax=10)
+
+    ax.set_xticks(np.arange(len(col_labels)))
+    ax.set_yticks(np.arange(len(row_labels)))
+    xlabels = ax.set_xticklabels(col_labels, rotation=45, ha="right")
+    xlabels[-1].set_fontweight("bold")
+    ax.set_yticklabels(row_labels)
+
+    total_col_idx = len(col_labels) - 1
+    for i in range(len(row_labels)):
+        for j in range(len(col_labels)):
+            val = matrix_np[i, j]
+            color = "white" if val > 6.5 else "black"
+            fmt = f"{val:.2f}" if j == total_col_idx else f"{val:.1f}"
+            weight = "bold" if j == total_col_idx else "normal"
+            ax.text(j, i, fmt, ha="center", va="center", color=color,
+                    fontsize=10, fontweight=weight)
+
+    fig.colorbar(im, ax=ax, label="Score (1-10)")
+    ax.set_title("LLM Judge Dimension Scores by Version (All LLMs Combined)")
+    fig.tight_layout()
+
+    return _save(fig, output_dir, "chart_combined_heatmap")
 
 def generate_all_charts(
     version_df: pd.DataFrame,
@@ -324,15 +459,19 @@ def generate_all_charts(
     raw_df: pd.DataFrame,
     output_dir: str,
     gpt_model: str = "gpt-5.4",
+    agg_df: pd.DataFrame | None = None,
 ) -> list[str]:
     """Generate all charts and return the list of file paths."""
     files: list[str] = []
 
     files.extend(chart_version_grouped_bar(version_df, output_dir))
     files.extend(chart_version_box_plot(raw_df, output_dir, gpt_model))
+    files.extend(chart_version_heatmap(version_df, output_dir))
     files.extend(chart_model_grouped_bar(model_df, output_dir))
     files.extend(chart_model_radar(model_df, output_dir))
     files.extend(chart_model_heatmap(model_df, output_dir))
+    if agg_df is not None and not agg_df.empty:
+        files.extend(chart_combined_heatmap(agg_df, output_dir))
 
     logger.info("Generated %d chart files in %s", len(files), output_dir)
     return files

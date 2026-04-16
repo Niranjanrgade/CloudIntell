@@ -26,7 +26,7 @@ from typing import Any, Dict, cast
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from cloudy_intell.agents.context import RuntimeContext
-from cloudy_intell.agents.tool_execution import execute_tool_calls, invoke_with_retries
+from cloudy_intell.agents.tool_execution import execute_tool_calls, invoke_with_retries, normalize_content
 from cloudy_intell.infrastructure.llm_factory import resolve_execution_llm, resolve_reasoning_llm
 from cloudy_intell.infrastructure.logging_utils import get_logger
 from cloudy_intell.infrastructure.tools import rebind_tools
@@ -149,7 +149,7 @@ Structure your argument with: Counterpoints to Azure, Additional Evidence, Conce
                 timeout=aws_ctx.settings.tool_timeout_seconds,
                 retry_attempts=aws_ctx.settings.llm_retry_attempts,
             )
-            argument = getattr(response, "content", "")
+            argument = normalize_content(getattr(response, "content", ""))
             if not argument or not argument.strip():
                 argument = f"[aws_advocate] Round {current_round}: Unable to generate argument."
         except Exception as exc:  # noqa: BLE001
@@ -248,7 +248,7 @@ Structure your argument with: Counterpoints to AWS, Additional Evidence, Concess
                 timeout=azure_ctx.settings.tool_timeout_seconds,
                 retry_attempts=azure_ctx.settings.llm_retry_attempts,
             )
-            argument = getattr(response, "content", "")
+            argument = normalize_content(getattr(response, "content", ""))
             if not argument or not argument.strip():
                 argument = f"[azure_advocate] Round {current_round}: Unable to generate argument."
         except Exception as exc:  # noqa: BLE001

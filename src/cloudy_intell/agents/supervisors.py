@@ -22,7 +22,7 @@ transient LLM API failures gracefully.
 import time
 from typing import cast
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from cloudy_intell.agents.context import RuntimeContext
 from cloudy_intell.infrastructure.llm_factory import resolve_reasoning_llm
@@ -97,7 +97,7 @@ def architect_supervisor(ctx: RuntimeContext):
 
         try:
             structured_llm = resolve_reasoning_llm(ctx, state).with_structured_output(TaskDecomposition)
-            messages = [SystemMessage(content=system_prompt)]
+            messages = [SystemMessage(content=system_prompt), HumanMessage(content=state["user_problem"])]
 
             task_decomposition = None
             last_error = None
@@ -224,7 +224,7 @@ def validator_supervisor(ctx: RuntimeContext):
 
         try:
             structured_llm = resolve_reasoning_llm(ctx, state).with_structured_output(ValidationDecomposition)
-            messages = [SystemMessage(content=system_prompt)]
+            messages = [SystemMessage(content=system_prompt), HumanMessage(content="Create validation tasks for the architecture above.")]
 
             validation_decomposition = None
             last_error = None

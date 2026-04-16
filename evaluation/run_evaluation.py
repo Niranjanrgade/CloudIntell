@@ -40,6 +40,10 @@ import sys
 import time
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()  # export .env vars (e.g. OPENAI_API_KEY) into os.environ
+
 from evaluation.analysis.aggregator import (
     aggregate_by_config,
     load_all_metrics,
@@ -245,11 +249,23 @@ def cmd_generate(args: argparse.Namespace) -> None:
     scenarios = _load_scenarios(base.scenarios_dir, run_filter.scenarios)
 
     experiments: list[ExperimentConfig] = []
-    experiment_filter = getattr(args, "experiment", "all")
-    if experiment_filter in ("all", "version"):
-        experiments.append(get_version_experiment(base))
-    if experiment_filter in ("all", "model"):
-        experiments.append(get_model_experiment(base))
+
+    # If user explicitly specifies both --model and --version, create an
+    # ad-hoc experiment so arbitrary model×version combinations work
+    # without being constrained to the predefined experiment matrices.
+    if run_filter.models and run_filter.versions:
+        experiments.append(ExperimentConfig(
+            name="model_comparison",
+            models=run_filter.models,
+            versions=run_filter.versions,
+            base=base,
+        ))
+    else:
+        experiment_filter = getattr(args, "experiment", "all")
+        if experiment_filter in ("all", "version"):
+            experiments.append(get_version_experiment(base))
+        if experiment_filter in ("all", "model"):
+            experiments.append(get_model_experiment(base))
 
     start_time = time.perf_counter()
     total_generated = 0
@@ -432,7 +448,7 @@ def cmd_analyze(args: argparse.Namespace) -> None:
     generate_all_tables(version_df, model_df, tables_dir)
 
     charts_dir = str(Path(base.output_dir) / "charts")
-    generate_all_charts(version_df, model_df, raw_df, charts_dir, EVAL_GPT_MODEL)
+    generate_all_charts(version_df, model_df, raw_df, charts_dir, EVAL_GPT_MODEL, agg_df=agg_df)
 
     logger.info("Analysis complete — tables in %s, charts in %s", tables_dir, charts_dir)
 
@@ -583,7 +599,7 @@ def run_full_evaluation(
     generate_all_tables(version_df, model_df, tables_dir)
 
     charts_dir = str(Path(base_config.output_dir) / "charts")
-    generate_all_charts(version_df, model_df, raw_df, charts_dir, EVAL_GPT_MODEL)
+    generate_all_charts(version_df, model_df, raw_df, charts_dir, EVAL_GPT_MODEL, agg_df=agg_df)
 
     elapsed = time.perf_counter() - start_time
     logger.info("Full evaluation complete in %.1f seconds", elapsed)

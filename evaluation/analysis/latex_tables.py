@@ -19,7 +19,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 # Display-friendly labels
-VERSION_LABELS: dict[str, str] = {"baseline": "Baseline", "agentic": "Agentic", "framework": "Framework"}
+VERSION_LABELS: dict[str, str] = {"baseline": "Single Prompt LLM", "agentic": "Agentic Framework", "framework": "Evaluator Optimiser Loop Framework"}
 MODEL_LABELS: dict[str, str] = {
     "gpt-5.4": "GPT-5.4",
     "claude-sonnet-4-6": "Claude Sonnet 4.6",
@@ -207,7 +207,7 @@ def generate_model_comparison_tables(
 
         lines = [
             _begin_table(
-                caption=f"Model Comparison — {metric_label} (Framework)",
+                caption=f"Model Comparison — {metric_label} (Evaluator Optimiser Loop Framework)",
                 label=f"tab:model_{metric}",
                 col_spec=col_spec,
             ),
@@ -257,7 +257,7 @@ def generate_model_summary_table(
 
     lines = [
         _begin_table(
-            caption="Model Comparison Summary (Framework, Aggregated Across Scenarios)",
+            caption="Model Comparison Summary (Evaluator Optimiser Loop Framework, Aggregated Across Scenarios)",
             label="tab:model_summary",
             col_spec=col_spec,
         ),
@@ -314,7 +314,7 @@ def generate_judge_breakdown_table(
 
     lines = [
         _begin_table(
-            caption="LLM Judge Dimension Breakdown by Model (Framework)",
+            caption="LLM Judge Dimension Breakdown by Model (Evaluator Optimiser Loop Framework)",
             label="tab:judge_breakdown",
             col_spec=col_spec,
         ),

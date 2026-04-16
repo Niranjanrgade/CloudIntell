@@ -24,12 +24,34 @@ keyword-based fallback if the LLM call fails.
 import time
 from typing import Any, Dict, List, Optional
 
-from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import Tool
 
 from cloudy_intell.infrastructure.logging_utils import get_logger
 
 logger = get_logger(__name__)
+
+
+def normalize_content(content: Any) -> str:
+    """Normalize LLM response content to a plain string.
+
+    Google Gemini models may return ``content`` as a list of content-part
+    dicts (e.g. ``[{"text": "..."}]``) instead of a plain string.  This
+    helper transparently handles both formats.
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict) and "text" in item:
+                parts.append(item["text"])
+            else:
+                parts.append(str(item))
+        return "\n".join(parts)
+    return str(content) if content else ""
 
 
 def invoke_with_retries(llm, prompt: str, node_name: str, retries: int = 3) -> str:
@@ -44,9 +66,9 @@ def invoke_with_retries(llm, prompt: str, node_name: str, retries: int = 3) -> s
     last_error: Exception | None = None
     for attempt in range(retries):
         try:
-            response = llm.invoke([SystemMessage(content=prompt)])
-            content = getattr(response, "content", "")
-            if not isinstance(content, str) or not content.strip():
+            response = llm.invoke([SystemMessage(content=prompt), HumanMessage(content="Generate the output as described above.")])
+            content = normalize_content(getattr(response, "content", ""))
+            if not content.strip():
                 raise ValueError(f"[{node_name}] Empty response from LLM")
             return content
         except Exception as exc:  # noqa: BLE001
@@ -279,8 +301,8 @@ def detect_errors_llm(validation_result: str, mini_llm) -> bool:
         Do not include any other text in your response.
         """
 
-        response = mini_llm.invoke([SystemMessage(content=prompt)])
-        result_text = str(getattr(response, "content", "")).strip().upper()
+        response = mini_llm.invoke([SystemMessage(content=prompt), HumanMessage(content="Answer YES or NO.")])
+        result_text = normalize_content(getattr(response, "content", "")).strip().upper()
 
         if result_text.startswith("YES"):
             return True

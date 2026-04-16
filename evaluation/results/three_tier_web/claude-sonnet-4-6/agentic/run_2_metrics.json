@@ -1,0 +1,14 @@
+{
+  "meteor": 0.15528708858150855,
+  "bert_score_precision": 0.7881098389625549,
+  "bert_score_recall": 0.8190484046936035,
+  "bert_score_f1": 0.8032813668251038,
+  "judge_completeness": 9,
+  "judge_technical_accuracy": 9,
+  "judge_security": 8,
+  "judge_scalability": 9,
+  "judge_best_practices": 9,
+  "judge_specificity": 9,
+  "judge_total": 8.833333333333334,
+  "elapsed_seconds": 172.3
+}

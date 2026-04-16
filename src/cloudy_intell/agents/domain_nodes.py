@@ -26,7 +26,7 @@ from typing import Any, Dict, cast
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from cloudy_intell.agents.context import RuntimeContext
-from cloudy_intell.agents.tool_execution import detect_errors_llm, execute_tool_calls, format_component_recommendations
+from cloudy_intell.agents.tool_execution import detect_errors_llm, execute_tool_calls, format_component_recommendations, normalize_content
 from cloudy_intell.infrastructure.llm_factory import resolve_execution_llm
 from cloudy_intell.infrastructure.logging_utils import get_logger
 from cloudy_intell.infrastructure.tools import rebind_tools
@@ -131,8 +131,8 @@ def _domain_architect(ctx: RuntimeContext, domain: str):
                 timeout=ctx.settings.tool_timeout_seconds,
                 retry_attempts=ctx.settings.llm_retry_attempts,
             )
-            content = getattr(response, "content", "")
-            if not content or not content.strip():
+            content = normalize_content(getattr(response, "content", ""))
+            if not content.strip():
                 raise ValueError(f"[{domain}_architect] Empty response from LLM")
             recommendations = format_component_recommendations(domain, domain_task, content)
         except Exception as exc:  # noqa: BLE001
@@ -253,8 +253,8 @@ def _domain_validator(ctx: RuntimeContext, domain: str):
                 timeout=ctx.settings.tool_timeout_seconds,
                 retry_attempts=ctx.settings.llm_retry_attempts,
             )
-            validation_result = getattr(response, "content", "Validation completed.")
-            if not validation_result or not validation_result.strip():
+            validation_result = normalize_content(getattr(response, "content", "Validation completed."))
+            if not validation_result.strip():
                 validation_result = f"[{domain}_validator] Validation completed but no detailed results provided."
         except Exception as exc:  # noqa: BLE001
             validation_result = f"[{domain}_validator] Error during validation: {exc}"

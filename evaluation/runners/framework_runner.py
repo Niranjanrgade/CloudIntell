@@ -13,7 +13,7 @@ import time
 from dataclasses import dataclass
 
 from cloudy_intell.agents.context import RuntimeContext
-from cloudy_intell.config.provider_meta import PROVIDER_REGISTRY, ProviderName
+from cloudy_intell.config.provider_meta import PROVIDER_REGISTRY
 from cloudy_intell.config.settings import get_settings
 from cloudy_intell.graph.builder import build_graph
 from cloudy_intell.graph.state_init import create_initial_state
@@ -55,7 +55,7 @@ def run_framework(
         A ``FrameworkResult`` with the final architecture summary text.
     """
     settings = get_settings()
-    provider_meta = PROVIDER_REGISTRY[ProviderName(provider)]  # type: ignore[call-overload]
+    provider_meta = PROVIDER_REGISTRY[provider]  # type: ignore[index]
 
     llm = get_llm(model_name)
     vector_store = create_vector_store(settings, provider)

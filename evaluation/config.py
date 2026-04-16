@@ -20,7 +20,7 @@ EVAL_GPT_MODEL = "gpt-5.4"
 EVAL_CLAUDE_MODEL = "claude-sonnet-4-6"
 EVAL_GEMINI_MODEL = "gemini-3.1-pro-preview"
 
-EVAL_JUDGE_MODEL = "gpt-4o"
+EVAL_JUDGE_MODEL = "claude-sonnet-4-6"
 
 # Versions
 VERSION_BASELINE = "baseline"
