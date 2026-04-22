@@ -371,9 +371,9 @@ def chart_version_heatmap(
 
     ax.set_xticks(np.arange(len(col_labels)))
     ax.set_yticks(np.arange(len(row_labels)))
-    xlabels = ax.set_xticklabels(col_labels, rotation=45, ha="right")
+    xlabels = ax.set_xticklabels(col_labels, rotation=45, ha="right", fontsize=12)
     xlabels[-1].set_fontweight("bold")
-    ax.set_yticklabels(row_labels)
+    ax.set_yticklabels(row_labels, fontsize=12)
 
     # Annotate cells with values (2 decimal places for Total column)
     total_col_idx = len(col_labels) - 1
@@ -384,10 +384,10 @@ def chart_version_heatmap(
             fmt = f"{val:.2f}" if j == total_col_idx else f"{val:.1f}"
             weight = "bold" if j == total_col_idx else "normal"
             ax.text(j, i, fmt, ha="center", va="center", color=color,
-                    fontsize=10, fontweight=weight)
+                    fontsize=13, fontweight=weight)
 
     fig.colorbar(im, ax=ax, label="Score (1-10)")
-    ax.set_title("LLM Judge Dimension Scores by Version (GPT-5.4)")
+    ax.set_title("LLM Judge Dimension Scores by Version (GPT-5.4)", fontsize=13)
     fig.tight_layout()
 
     return _save(fig, output_dir, "chart_version_heatmap")
@@ -433,9 +433,9 @@ def chart_combined_heatmap(
 
     ax.set_xticks(np.arange(len(col_labels)))
     ax.set_yticks(np.arange(len(row_labels)))
-    xlabels = ax.set_xticklabels(col_labels, rotation=45, ha="right")
+    xlabels = ax.set_xticklabels(col_labels, rotation=45, ha="right", fontsize=12)
     xlabels[-1].set_fontweight("bold")
-    ax.set_yticklabels(row_labels)
+    ax.set_yticklabels(row_labels, fontsize=12)
 
     total_col_idx = len(col_labels) - 1
     for i in range(len(row_labels)):
@@ -445,10 +445,10 @@ def chart_combined_heatmap(
             fmt = f"{val:.2f}" if j == total_col_idx else f"{val:.1f}"
             weight = "bold" if j == total_col_idx else "normal"
             ax.text(j, i, fmt, ha="center", va="center", color=color,
-                    fontsize=10, fontweight=weight)
+                    fontsize=13, fontweight=weight)
 
     fig.colorbar(im, ax=ax, label="Score (1-10)")
-    ax.set_title("LLM Judge Dimension Scores by Version (All LLMs Combined)")
+    ax.set_title("LLM Judge Dimension Scores by Version (All LLMs Combined)", fontsize=13)
     fig.tight_layout()
 
     return _save(fig, output_dir, "chart_combined_heatmap")

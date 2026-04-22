@@ -1,0 +1,44 @@
+\chapter{Conclusion and Future Work}
+
+\section{Conclusion}
+
+This thesis describes the design, implementation, and evaluation of a multi-cloud agentic AI framework for cloud architecture generation and validation. The system addresses key limitations of existing tools by producing end-to-end, factually grounded, and cross-provider architectural recommendations.
+
+Grounded in prior work on Multi-Agent Systems \cite{sycara1998multiagent} and Retrieval-Augmented Generation \cite{lewis2020rag}, this thesis introduces a self-correcting Evaluator–Optimizer workflow \cite{anthropic2024agents}, implemented as a multi-agent graph using LangGraph \cite{langgraph2024docs}. This design ensures that generated architectures are iteratively validated and refined against authoritative vendor documentation.
+
+The implementation combines LangGraph-based subgraph composition, two-stage RAG with cross-encoder reranking, and a model selection mechanism spanning three frontier LLM families. The prototype also includes infrastructure-as-code generation and a Next.js user interface with real-time workflow visualisation, structured debate views, and side-by-side multi-cloud comparison.
+
+The prototype implementation demonstrates the feasibility of this approach, successfully operationalising the feedback-driven refinement loop. Empirical evaluation across a set of benchmark scenarios, three framework variants, and three frontier language models yields two principal findings. First, the Evaluator–Optimizer loop produces a measurable improvement in architectural quality, with LLM judge scores increasing from 9.028 for a single-prompt baseline to 9.112 for an agentic system without validation, and further to 9.166 under the full iterative framework, a gain attributable to the validation stage. Second, all evaluated models— Claude Sonnet 4.6 (9.415), GPT-5.4 (9.083), and Gemini 3.1 Pro (9.0)—achieve scores above 9.0, indicating that the framework provides a strong structural foundation that generalises across model families. While Claude Sonnet 4.6 attains the highest score, the potential for self-evaluation bias, given the shared model family with the judge, necessitates cautious interpretation pending independent multi-judge validation.
+
+Together, these findings support the central claim of this thesis: that an iterative, grounded, multi-agent architecture—combining structured domain decomposition with feedback-driven refinement—consistently outperforms monolithic and partially agentic approaches in complex, open-ended cloud architecture generation tasks.
+
+
+\section{Limitations}
+The following limitations of the current prototype should be noted:
+\begin{itemize}
+    \item \textbf{Knowledge Base Dependency:} The system's accuracy is entirely dependent on the quality and coverage of services in the vector database. Outdated or missing documentation (e.g., from complex PDFs not parsed correctly) will lead to incorrect validation.
+    \item \textbf{Official Documentation Updation:} The vector stores are populated from point-in-time ingestion runs. Cloud provider documentation evolves continuously, so re-ingestion pipelines must be scheduled regularly to prevent stale RAG retrievals. 
+    \item \textbf{Lack of Real-time Data:} The framework does not have access to real-time, account-specific data such as instance pricing, regional service availability, or existing outage.
+
+
+    \item \textbf{Absence of User Account Context:} Agent recommendations are grounded in documentation but not in the user's actual cloud environment. Service quota limits, existing resource configurations, and organisation-level permission boundaries are not visible to the agents, which may cause recommendations to be technically valid in general but inapplicable in specific deployment contexts.
+
+    \item \textbf{Judge Selection Bias:} The evaluation pipeline uses a single judge model, \texttt{claude-sonnet-4-6}, which is also one of the test models. This configuration introduces a potential self-enhancement bias that may inflate Claude's reported scores relative to GPT and Gemini models.
+
+    \item \textbf{API Cost Sensitivity:} Full-pipeline evaluation with high-context reranked RAG, parallel domain agents, and an LLM judge incurs substantially higher API costs than baseline approaches. Cost optimisation strategies such as prompt caching and selective tool invocation remain unexplored.
+
+    \item \textbf{Scope of Evaluation:} The prototype evaluation will be conducted using benchmark scenarios. A large-scale, real-world usability study is outside the scope of this M.Tech project.
+\end{itemize}
+
+\section{Future Work}
+The work completed in this project and the findings derived from it open several concrete directions for continued research and engineering development.
+
+\begin{itemize}
+    \item \textbf{Google Cloud Platform Integration:} Adding GCP as a third entry in the framework would expand the debate matrix to a three-way comparison and enable multi-cloud recommendations that span all major hyperscalers. The provider metadata abstraction is intentionally designed to accommodate this extension with minimal structural changes.
+
+    \item \textbf{Persistent Checkpoint Backends:} The current checkpointing layer uses an in-memory \texttt{MemorySaver}, which does not survive process restarts. Migrating to a persistent backend such as PostgreSQL-backed LangGraph checkpointing would support long-running, resumable sessions and enable audit trails for compliance-sensitive use cases.
+
+    \item \textbf{IaC Template Execution in Sandboxed Environments:} The current framework generates IaC artifacts. A natural next step is to deploy in sandbox environment and report infrastructure-level errors back if any into the Evaluator-Optimizer loop.
+
+    \item \textbf{Live Account Context Injection:} Extending the UI to accept temporary cloud credentials would allow the framework to query service quotas, list existing resources, and tailor recommendations to the user's actual account state. This would transform the system from a documentation-grounded advisory tool into a context-aware deployment assistant.
+\end{itemize}
